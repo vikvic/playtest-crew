@@ -6,6 +6,10 @@ out
 dist
 *.tgz
 
+# playtest run artifacts (traces/videos/screenshots per run; known-good CI
+# baselines will live elsewhere and be checked in explicitly)
+runs/
+
 # code coverage
 coverage
 *.lcov
