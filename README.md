@@ -9,22 +9,29 @@ v0 scope: one game (a seeded fork of [2048](https://github.com/gabrielecirulli/2
 ```bash
 bun install
 
-# run a playtest (headless by default)
+# run a playtest (headless by default, seeded random driver)
 bun src/cli.ts run --game 2048
+
+# let the LLM explorer play instead (needs ANTHROPIC_API_KEY in .env)
+bun src/cli.ts run --game 2048 --driver explorer
 
 # watch the bot play
 bun src/cli.ts run --game 2048 --headed
 
 # replay a recorded trace 3 times and verify determinism
 bun src/cli.ts replay --trace runs/<name>/trace.jsonl --times 3
+
+# re-record + 3/3-verify the checked-in CI baseline after any adapter change
+bun src/cli.ts rebaseline --game 2048
 ```
 
 `run` flags:
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
+| `--driver <name>` | random | `random` (seeded walker) or `explorer` (LLM; model via `PTC_MODEL`, default `claude-opus-4-8`) |
 | `--seed <n>` | 42 | Deterministic seed (game PRNG + move driver) |
-| `--max-actions <n>` | 200 | Action budget per run |
+| `--max-actions <n>` | spec | Action budget per run (default from `specs/<game>.yaml`) |
 | `--gap <ms>` | 120 | Pacing between actions (`0` = as fast as the harness can go) |
 | `--screenshot-every <n>` | 10 | Screenshot sampling interval (`0` = off) |
 | `--out <dir>` | `runs/<run-id>` | Output directory |
@@ -37,21 +44,46 @@ bun src/cli.ts replay --trace runs/<name>/trace.jsonl --times 3
 Each run writes to `runs/<name>/`:
 
 ```
-summary.json                    outcome: pass | candidate-finding | harness-error
+summary.json                    outcome, distinct-state count, candidates, llm stats
 trace.jsonl                     versioned header + one line per action (see Trace format)
+llm.jsonl                       explorer runs only: one line per LLM call — the state the
+                                model saw, its chosen action and stated reasoning ("why"),
+                                token usage, and a videoTs offset into the run video
+                                (fallback lines keep the raw unparseable response)
 video/*.webm                    full-run recording
 shots/                          sampled screenshots
-findings/console-error-<i>/     one folder per oracle fire:
-  trace.cut.jsonl               trace cut at the failing action — the replayable repro
-  console.txt                   the captured error
+findings/<oracle>-<i>/          one folder per deduped candidate (console-error, invariant, hang):
+  trace.cut.jsonl               trace cut at the firing action — the replayable repro
+  oracle.txt                    what fired and why
   at-fire.png                   screenshot at the moment of failure
 ```
 
+Candidates are deduped by (oracle, signature) and bundled up to the spec's `max_verifications` cap (default 5); overflow is listed in the summary as unverified candidates. Three oracles ride along on every run: **console-error** (page errors + `console.error`), **invariant** (spec predicates over the state — a predicate that throws also fires), and **hang** (state hash unchanged for N dispatched actions — suppressed while a `terminal_states` predicate holds, so a game-over screen never ships as a "verified" non-bug). Verdict logic for the W3 verification pipeline (3/3 reproduction, ±3 index tolerance, flake demotion) lives in `src/verdict.ts`.
+
 ## How moves are decided
 
-Today (W1) there is no AI in the loop — deliberately. The driver is a **seeded random walker**: a Mulberry32 PRNG (seeded `seed ^ 0x9e3779b9`, distinct from the game's own tile-spawn PRNG) picks uniformly from the game's declared action list. Same seed → same move sequence, which is what makes the determinism proof possible.
+Two drivers, selected with `--driver`; everything downstream (trace, hashing, replay, oracles) is driver-blind.
 
-The W2 deliverable swaps that picker for an **LLM Explorer**: it sees the current game state plus recent history and returns the next action via a provider-agnostic `LLMClient`. Its success criterion is that it must measurably beat the random walker (deeper states, more oracle fires) or it isn't earning its API cost. Everything downstream — trace, hashing, replay, oracles — doesn't care who picked the move; the driver is just a function `(state, rng) → action`.
+- **`random`** (default): a seeded Mulberry32 walker (seeded `seed ^ 0x9e3779b9`, distinct from the game's tile-spawn PRNG) picks uniformly from the action alphabet. Same seed → same move sequence — the determinism baseline, and the coverage baseline the explorer must beat.
+- **`explorer`** (W2): each step, the LLM sees the serialized game state, the described action alphabet, and its recent actions annotated with whether each one changed anything, and returns the next action through a provider-agnostic `LLMClient` (`src/llm.ts`; Anthropic impl in v0, choice constrained server-side via a JSON-schema enum, stable system prompt cached). An unusable response falls back to a seeded random pick (counted in the summary); an API failure that survives retries ends the run as harness-error.
+
+The success criterion — explorer must cover at least as many distinct states (unique `preStateHash` values) as random on the same budget — is measured in the run summary. First measurement (2048, seed 42, 100 actions): **explorer 83 distinct states vs random 62 (+34%)**, mostly because random burns budget on no-op moves and the explorer avoids them.
+
+### Inspecting the explorer's decisions
+
+Every explorer run writes `llm.jsonl` next to the trace — one line per API call:
+
+```json
+{"videoTs":"0:07.1","videoTMs":7124,"actionIndex":3,"state":{...},"action":"ArrowLeft",
+ "why":"Merge the two adjacent 2s in the bottom row into a 4.","fallback":false,
+ "usage":{"inputTokens":712,"outputTokens":31,"cacheReadInputTokens":0}}
+```
+
+- `videoTs` / `videoTMs` is the offset into that run's `video/*.webm` (capture starts at page creation), so you can scrub the recording to the exact moment of any decision.
+- `state` is the exact JSON the model saw; `action` + `why` are its choice and stated reasoning; `usage` makes per-run API cost auditable.
+- Fallback lines carry `fallback: true` plus the raw unparseable response instead of `why`.
+
+This log is the explorer's debugger. Its first use immediately caught a real bug: the model described two side-by-side tiles as "vertically adjacent" — the 2048 adapter serializes its grid column-major (`grid[x][y]`) and the model assumed rows, burning budget on no-op moves. The fix is the `state_notes` field in `specs/<game>.yaml`: free-text notes on how to read the state JSON (orientation, units, quirks), injected into the explorer's system prompt.
 
 ## Architecture: how moves reach the browser
 
@@ -123,10 +155,10 @@ The harness never *discovers* actions — you declare them. `GameConfig.actions`
 
 There is deliberately no per-state legality check. The harness leans on a property most games share: an inapplicable input is a **no-op**. If 2048 can't move left, ArrowLeft changes nothing, the next `preStateHash` equals the previous one, and replay still works. Solving "which actions are legal right now?" would require deep game-specific knowledge; ignoring the question stays deterministic.
 
-Action *context* arrives in W2, in two pieces:
+Action *context* comes in two pieces (both landed in W2):
 
-1. The **YAML game spec** lets each action carry a human-readable description ("ArrowLeft — slide all tiles left, merging equal neighbors"). Authoring those descriptions is the porting step where you teach the harness what the game *means*, not just where its files live.
-2. The **LLM Explorer** consumes them: its prompt gets the state snapshot, recent action history, and the described alphabet, and legality/strategy live in the model's judgment — the harness only validates that the chosen action is in the alphabet, then dispatches it.
+1. The **YAML game spec** (`specs/<game>.yaml`) gives each action a human-readable description, plus budgets, invariants, `terminal_states`, and `state_notes` (how to read the state JSON — see "Inspecting the explorer's decisions") — the declarative half of a game integration (the code hooks stay in `src/games/<game>.ts`). Authoring the spec is the porting step where you teach the harness what the game *means*, not just where its files live.
+2. The **LLM Explorer** consumes them: its prompt gets the state snapshot, recent action history (with no-op annotations — without them the model can't tell a move did nothing and wedges on it), and the described alphabet. Legality/strategy live in the model's judgment — the harness constrains the choice to the alphabet via a JSON-schema enum, then dispatches it.
 
 Known gap: games whose action space changes shape per state (appearing buttons, menus, unit selection). Pointer actions cover *fixed* click targets declared up front, but enumerating "what's clickable right now" would need a per-state affordance scanner — not in v0 scope, and one reason the W2 candidate spikes target keyboard-driven games where a static alphabet is the true action space.
 
@@ -159,8 +191,9 @@ The harness is game-agnostic; a game plugs in via a `GameConfig` (`src/games/typ
 
 1. **State extraction** — the game must expose a JSON-serializable state snapshot (`window.__ptc_state()`). Easy with source access; painful without.
 2. **Determinism** — every `Math.random()` call site that affects gameplay must route through `(window.__ptc_rng || Math.random)()`. 2048 had exactly two. Games with physics, `Date.now()` dependencies, or animation-frame-sensitive logic are where replay fidelity gets hard — which is why W2 starts with replay-fidelity **spikes** on candidate games (vendor, patch, record 60 actions, replay 3×) to disqualify bad fits in 30 minutes instead of a lost weekend.
+3. **The spec** — `specs/<game>.yaml`: action descriptions, budgets, invariants, `terminal_states`, and `state_notes` explaining any non-obvious state encoding (2048's grid is column-major; without that note the explorer misread the board). A short explorer run with a look at `llm.jsonl` will tell you whether the model understands your state format.
 
-A simple deterministic DOM/keyboard game ports in under an hour. W2 also adds a YAML game-spec parser so most of the config becomes declarative.
+A simple deterministic DOM/keyboard game ports in under an hour. Most of the config is declarative via the YAML spec; the code hooks (`src/games/<game>.ts`) are ~20 lines.
 
 ## Playing 2048 yourself
 
