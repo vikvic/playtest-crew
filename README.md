@@ -76,6 +76,46 @@ Two drivers, selected with `--driver`; everything downstream (trace, hashing, re
 
 The success criterion — explorer must cover at least as many distinct states (unique `preStateHash` values) as random on the same budget — is measured in the run summary. First measurement (2048, seed 42, 100 actions): **explorer 83 distinct states vs random 62 (+34%)**, mostly because random burns budget on no-op moves and the explorer avoids them.
 
+### What the LLM is actually told
+
+The model has no built-in game engine and is never taught formal rules. Everything it knows arrives in the prompt, assembled fresh each step (`src/explorer.ts`):
+
+```
+SYSTEM PROMPT (identical every step → cacheable)
+  "You are an expert game playtester exploring the game <name> ..."
+                                          └── from spec: game
+  How to read the state JSON:
+    <state_notes>                         └── from spec: state_notes
+                                              (e.g. "grid[x][y] is column-major...")
+  Available actions:
+    - ArrowUp:    <description>           └── from spec: actions[].description
+    - ArrowDown:  <description>               (what each move DOES in this game)
+    - ...
+  Goals, in priority order:
+    1. reach unseen states  2. avoid no-op moves  3. keep the game alive
+
+USER PROMPT (changes every step)
+  Current state:
+    {"grid":[[2,0,0,4],...],"score":20,"over":false,"won":false}
+                                          └── window.__ptc_state(), read live
+  Your last 12 actions (oldest first):
+    ArrowLeft, ArrowDown (changed nothing!), ArrowUp, ...
+                                          └── trace history; "(changed nothing!)"
+                                              computed by comparing state hashes
+
+RESPONSE (enforced server-side by a JSON-schema enum —
+          the model CANNOT answer with a move outside the alphabet)
+  {"action": "ArrowLeft", "why": "Merge the two 2s in the bottom row."}
+```
+
+So "understanding the game" is three layers, weakest to strongest:
+
+1. **Prior knowledge** — the model already knows famous games by name (it knows what 2048 is). Free but unreliable for obscure games.
+2. **The YAML spec** — your action descriptions and `state_notes` are the explicit teaching channel. This is where you correct the model's assumptions (see the column-major story below).
+3. **Live feedback** — the no-op annotations in the history. Rules are never encoded formally; an illegal move is simply a wasted step marked "(changed nothing!)", and the model learns to stop trying it.
+
+Valid moves are not a per-state judgment: the response schema restricts the choice to the fixed action alphabet, and anything inapplicable in the current state is a harmless no-op (see "Action model").
+
 ### Inspecting the explorer's decisions
 
 Every explorer run writes `llm.jsonl` next to the trace — one line per API call:
