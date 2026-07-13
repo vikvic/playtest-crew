@@ -15,6 +15,13 @@ bun src/cli.ts run --game 2048
 # let the LLM explorer play instead (needs ANTHROPIC_API_KEY in .env)
 bun src/cli.ts run --game 2048 --driver explorer
 
+# LLM-driven run, capped at 30 steps, with reasoning + video recorded:
+#   video/*.webm        — the full run
+#   llm.jsonl           — one line per step: state seen, chosen action,
+#                         the model's reasoning ("why"), token usage, and
+#                         a videoTs offset to scrub the video to that moment
+bun src/cli.ts run --game 2048 --driver explorer --max-actions 30
+
 # watch the bot play
 bun src/cli.ts run --game 2048 --headed
 
