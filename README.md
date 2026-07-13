@@ -194,6 +194,8 @@ For speed, `--gap 0 --screenshot-every 0` removes all artificial delay; for a tu
 
 ## Porting to another game
 
+**Full step-by-step guide: [docs/PORTING.md](docs/PORTING.md)** — every step points at the 2048 files as the worked example.
+
 The harness is game-agnostic; a game plugs in via a `GameConfig` (`src/games/types.ts`, ~30 lines — see `src/games/g2048.ts`), registered in `src/games/index.ts`: file location, viewport, legal actions, `waitUntilReady`, and a `readState`. The real porting cost is elsewhere:
 
 1. **State extraction** — the game must expose a JSON-serializable state snapshot (`window.__ptc_state()`). Easy with source access; painful without.
