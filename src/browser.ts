@@ -80,6 +80,8 @@ export interface GameLaunch {
   context: BrowserContext;
   page: Page;
   server: GameServer;
+  /** Epoch ms when the page (and its video recording) was created. */
+  videoStartedAt: number;
   close(): Promise<void>;
 }
 
@@ -100,6 +102,7 @@ export async function launchGame(opts: LaunchOptions): Promise<GameLaunch> {
   // Scoped PRNG must exist before any game script evaluates (fresh context
   // per launch also guarantees empty localStorage — no stale saved game).
   await context.addInitScript(prngInitScript(opts.seed));
+  const videoStartedAt = Date.now(); // video capture begins with the page
   const page = await context.newPage();
   await page.goto(server.url + opts.game.entry);
   await opts.game.waitUntilReady(page);
@@ -108,6 +111,7 @@ export async function launchGame(opts: LaunchOptions): Promise<GameLaunch> {
     context,
     page,
     server,
+    videoStartedAt,
     async close() {
       await context.close(); // flushes video
       await browser.close();
