@@ -1,0 +1,60 @@
+# Game spec for the forked, seeded 2048 (games/2048).
+# Declarative half of the game integration; the code hooks (dir resolution,
+# waitUntilReady, readState) live in src/games/g2048.ts. See README "Action
+# model" for how actions + descriptions are consumed.
+
+game: "2048"
+entry: index.html
+viewport: { w: 1280, h: 800 }
+
+# Determinism contract — must match the fork, replayer refuses otherwise.
+seed_strategy: scoped-prng
+state_source: adapter
+adapter_version: 2048-fork@1
+
+# Shown to the explorer so it reads the state correctly. The grid is
+# COLUMN-major (grid[x][y]) — without this note the model assumes rows and
+# misjudges which tiles are adjacent.
+state_notes: >
+  The grid is column-major: grid[x][y] where x is the column (0 = leftmost)
+  and y is the row (0 = top). So grid[1][3] and grid[2][3] are horizontally
+  adjacent tiles in the bottom row. 0 means an empty cell.
+
+# Static action alphabet. Descriptions are the explorer's context (W2);
+# the random driver ignores them. An inapplicable action must be a no-op.
+actions:
+  - key: ArrowUp
+    description: Slide all tiles up; equal vertical neighbors merge.
+  - key: ArrowRight
+    description: Slide all tiles right; equal horizontal neighbors merge.
+  - key: ArrowDown
+    description: Slide all tiles down; equal vertical neighbors merge.
+  - key: ArrowLeft
+    description: Slide all tiles left; equal horizontal neighbors merge.
+
+budgets:
+  max_actions: 200
+  screenshot_every: 10
+  max_verifications: 5
+
+oracles:
+  console_errors: true
+  hang:
+    # hashed state unchanged for N consecutive dispatched actions -> candidate
+    unchanged_actions: 10
+  invariants:
+    # Expressions over the adapter state ({grid: number[4][4], score, over, won}).
+    # false -> candidate finding; a thrown error also fires (invariant-error).
+    - name: score-non-negative
+      expr: state.score >= 0
+    - name: tiles-are-powers-of-two
+      expr: state.grid.every(col => col.every(v => v === 0 || (v >= 2 && (v & (v - 1)) === 0)))
+    - name: grid-is-4x4
+      expr: state.grid.length === 4 && state.grid.every(col => col.length === 4)
+
+# While any of these holds, the hang oracle is suppressed (a game-over screen
+# that ignores input is not a hang — reproducible != true).
+# state.won covers the win overlay, which also blocks input until dismissed.
+terminal_states:
+  - state.over === true
+  - state.won === true
