@@ -225,6 +225,23 @@ export async function run(opts: RunOptions): Promise<RunSummary> {
       join(findingDir, "oracle.txt"),
       extraEvidence !== undefined ? `${fire.detail}\n\n${extraEvidence}` : fire.detail,
     );
+    // Machine-readable candidate identity — the W3 verifier reads this to
+    // know which (oracle, signature) must refire during replay.
+    writeFileSync(
+      join(findingDir, "candidate.json"),
+      JSON.stringify(
+        {
+          game: game.name,
+          seed: opts.seed,
+          oracle: fire.oracle,
+          signature: fire.signature,
+          atActionIndex: fire.atActionIndex,
+          detail: fire.detail,
+        },
+        null,
+        2,
+      ),
+    );
     await page.screenshot({ path: join(findingDir, "at-fire.png") });
     candidate.dir = findingDir;
     summary.candidates.push(candidate);
