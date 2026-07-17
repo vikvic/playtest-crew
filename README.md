@@ -28,6 +28,14 @@ bun src/cli.ts run --game 2048 --headed
 # replay a recorded trace 3 times and verify determinism
 bun src/cli.ts replay --trace runs/<name>/trace.jsonl --times 3
 
+# judge a run's candidates: replay each cut trace 3x — same oracle must
+# refire every time (within ±3 actions) to earn "finding", else it's a flake
+bun src/cli.ts verify --run runs/<name>
+
+# unattended bug hunt: sweep seeds, auto-verify every candidate,
+# write report.md + report.json
+bun src/cli.ts hunt --game 2048 --seeds 1-20
+
 # re-record + 3/3-verify the checked-in CI baseline after any adapter change
 bun src/cli.ts rebaseline --game 2048
 ```
@@ -62,10 +70,20 @@ shots/                          sampled screenshots
 findings/<oracle>-<i>/          one folder per deduped candidate (console-error, invariant, hang):
   trace.cut.jsonl               trace cut at the firing action — the replayable repro
   oracle.txt                    what fired and why
+  candidate.json                machine-readable identity (oracle, signature, fire index)
   at-fire.png                   screenshot at the moment of failure
+  verdict.json                  written by `verify`: finding|flake + reproduction details
 ```
 
-Candidates are deduped by (oracle, signature) and bundled up to the spec's `max_verifications` cap (default 5); overflow is listed in the summary as unverified candidates. Three oracles ride along on every run: **console-error** (page errors + `console.error`), **invariant** (spec predicates over the state — a predicate that throws also fires), and **hang** (state hash unchanged for N dispatched actions — suppressed while a `terminal_states` predicate holds, so a game-over screen never ships as a "verified" non-bug). Verdict logic for the W3 verification pipeline (3/3 reproduction, ±3 index tolerance, flake demotion) lives in `src/verdict.ts`.
+Candidates are deduped by (oracle, signature) and bundled up to the spec's `max_verifications` cap (default 5); overflow is listed in the summary as unverified candidates. Three oracles ride along on every run: **console-error** (page errors + `console.error`), **invariant** (spec predicates over the state — a predicate that throws also fires), and **hang** (state hash unchanged for N dispatched actions — suppressed while a `terminal_states` predicate holds, so a game-over screen never ships as a "verified" non-bug).
+
+### Candidate → finding: the verification pipeline
+
+A run only ever produces **candidates**. `verify` (per run or per bundle) replays the candidate's cut trace 3 times with the oracles observing, and judges (`src/verdict.ts`):
+
+- **finding** — the same (oracle, signature) refires on **every** replay within ±3 actions of the original fire index. The bundle's `verdict.json` records the refire indexes.
+- **flake** — anything less. Evidence is kept, but it is not a bug report.
+- A pre-fire state-hash mismatch during replay never changes the verdict; it sets a `nondeterministic` trust flag on the result so you know the repro rests on shakier ground.
 
 ## How moves are decided
 
@@ -220,15 +238,13 @@ Known gap: games whose action space changes shape per state (appearing buttons, 
 
 ## Headless / accelerated loops
 
-Headless is the default. A seed-sweep bug hunt is just a shell loop today:
+Headless is the default. A seed-sweep bug hunt is one command (W3):
 
-```powershell
-foreach ($seed in 1..50) {
-  bun src/cli.ts run --game 2048 --seed $seed --out "runs/hunt-$seed"
-}
+```bash
+bun src/cli.ts hunt --game 2048 --seeds 1-50
 ```
 
-then grep `runs/hunt-*/summary.json` for `"candidate-finding"`. Runs are independent — launch several in parallel for free throughput.
+Each seed gets a lean run (no video, no screenshots, `--gap 0`), every candidate is auto-verified 3×, and the hunt ends with `report.md` / `report.json`: verified findings (each with its replay command), flakes, unverified-over-budget candidates, and a per-seed run table. A clean hunt reports "0 verified findings" plainly — that number over N seeds × M actions is itself the deliverable.
 
 For speed, `--gap 0 --screenshot-every 0` removes all artificial delay; for a turn-based game like 2048 the cost per action is then just harness overhead (~10–30ms), so a 200-action run takes a few seconds. Caveat: that removes *pacing*, it doesn't accelerate the game's clock — a real-time game still runs at wall-clock speed. True acceleration (faking `performance.now()` / `requestAnimationFrame`) is the W3 virtual-time spike; it's a spike because virtual time can itself break replay fidelity.
 

@@ -45,14 +45,32 @@ instead of DOM; oracle validated via a temporary planted bug (reverted).
 - Demand checkpoint (non-code, founder task): any replies/calls from the 15
   outreach messages? Reply-calibrated kill-switch triggers at end of W2.
 
-## W3
+## W3 — done (code deliverables)
 
-- Replay verification of candidate findings: 3/3 reproduction, ±3 action-index
-  tolerance, `max_verifications` budget (default 5).
-- Unattended bug hunt (honest fallback deliverable if no real bugs surface).
-- Virtual-time spike (Open Question 5): fake `performance.now()` /
-  `requestAnimationFrame` to accelerate real-time games — timeboxed, since
-  virtual time can itself break replay fidelity.
+- Verification pipeline (`src/verify.ts`, `playtest verify`): replays each
+  candidate's cut trace 3× with oracles observing (`src/replayer.ts` gained
+  `observeOracles` + `continueOnMismatch`), feeds the observations to
+  `src/verdict.ts`, writes `verdict.json` into the bundle. Candidate bundles
+  now carry a machine-readable `candidate.json`; older bundles are rejected
+  with a clear re-record message.
+- Validated end-to-end with the W1 planted-bug method: temporary spec
+  invariant (`state.score < 40`) fired at action 14, verify judged it
+  FINDING 3/3, invariant reverted before commit (`runs/w3-planted/`).
+- Unattended bug hunt (`src/hunt.ts`, `playtest hunt --seeds 1-50`): lean
+  per-seed runs (no video/screenshots, gap 0), auto-verify every candidate,
+  `report.md` + `report.json` with findings / flakes / unverified strictly
+  separated. Smoke: 5 seeds × 150 actions in ~9s, honest "0 findings" report
+  (`runs/w3-hunt-smoke/`).
+
+## W3 — deferred
+
+- Virtual-time spike (Open Question 5): no live target — 2048 is turn-based,
+  so there is nothing to validate the spike against until a real-time game
+  is vendored. Do it together with the first real-time port.
+- Phaser candidate shortlist + replay-fidelity spikes (slipped from W2):
+  needs third-party games vendored; unchanged, still blocks Open Question 1.
+- Demand checkpoint (non-code, founder task): check replies to the outreach
+  batch; the reply-calibrated kill-switch decision is overdue from end of W2.
 
 ## Post-v0
 
