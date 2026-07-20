@@ -217,6 +217,38 @@ if (command === "run") {
   );
   console.log(`  report: ${join(values.out ?? join("runs", `hunt-${stamp}`), "report.md")}`);
   process.exit(0);
+} else if (command === "bench") {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      game: { type: "string", default: "2048" },
+      seed: { type: "string", default: "42" },
+      "max-actions": { type: "string", default: "60" },
+      models: { type: "string" },
+      out: { type: "string" },
+    },
+  });
+  if (!values.models) usage();
+  const { bench, parseModelSpecs } = await import("./bench.ts");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const out = values.out ?? join("runs", `bench-${stamp}`);
+  const report = await bench({
+    game: values.game!,
+    seed: Number(values.seed),
+    maxActions: Number(values["max-actions"]),
+    models: parseModelSpecs(values.models!),
+    out,
+  });
+  console.log(`\nbench: ${report.models.length} model(s) compared`);
+  for (const m of report.models) {
+    const latency = m.avgCallLatencyMs === null ? "" : `, ~${Math.round(m.avgCallLatencyMs)}ms/call`;
+    console.log(
+      `  ${m.label}: ${m.outcome}, ${m.distinctStates}/${m.actions} distinct states, ` +
+        `${m.calls} calls, ${m.randomFallbacks} fallbacks${latency}`,
+    );
+  }
+  console.log(`  report: ${join(out, "bench.md")}`);
+  process.exit(0);
 } else if (command === "replay") {
   const { values } = parseArgs({
     args: rest,

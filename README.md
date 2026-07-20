@@ -118,6 +118,17 @@ Two drivers, selected with `--driver`; everything downstream (trace, hashing, re
 
 The success criterion — explorer must cover at least as many distinct states (unique `preStateHash` values) as random on the same budget — is measured in the run summary. First measurement (2048, seed 42, 100 actions): **explorer 83 distinct states vs random 62 (+34%)**, mostly because random burns budget on no-op moves and the explorer avoids them.
 
+### Comparing models
+
+`playtest bench` runs the explorer under several `LLMClient` configs on the *same* game/seed/budget and reports which one actually explores better — distinct-state coverage, random-fallback rate, and per-call latency — not just "can it play":
+
+```bash
+bun src/cli.ts bench --game 2048 --seed 7 --max-actions 60 \
+  --models "openai-compatible:llama3.2,openai-compatible:qwen2.5:7b-instruct"
+```
+
+Measured (2048, seed 7, 60 actions): `qwen2.5:7b-instruct` reached 57/60 distinct states vs `llama3.2`'s 51/60, at roughly 1.25× the per-call latency (812ms vs 456ms) — better decisions, slower wall-clock, the trade-off you'd expect from a same-size-class model with stronger instruction-following. A model with no API key or an unreachable endpoint doesn't abort the comparison — it's recorded as a `harness-error` row with its error message, same honest-accounting rule as `hunt`'s findings/flakes/unverified split.
+
 ### What the LLM is actually told
 
 The model has no built-in game engine and is never taught formal rules. Everything it knows arrives in the prompt, assembled fresh each step (`src/explorer.ts`):
