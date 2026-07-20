@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mulberry32, prngInitScript } from "../src/prng";
+import { mulberry32, prngInitScript, globalRandomPatchInitScript } from "../src/prng";
 
 describe("mulberry32", () => {
   test("same seed → same sequence", () => {
@@ -32,5 +32,13 @@ describe("mulberry32", () => {
     new Function("window", script)(fakeWindow);
     const ts = mulberry32(42);
     for (let i = 0; i < 1000; i++) expect(fakeWindow.__ptc_rng!()).toBe(ts());
+  });
+
+  test("global-random-patch script overwrites Math.random with the IDENTICAL sequence", () => {
+    const script = globalRandomPatchInitScript(42);
+    const fakeMath = { random: Math.random, imul: Math.imul };
+    new Function("Math", script)(fakeMath);
+    const ts = mulberry32(42);
+    for (let i = 0; i < 1000; i++) expect(fakeMath.random()).toBe(ts());
   });
 });

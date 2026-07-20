@@ -12,7 +12,7 @@ import { openSync, writeSync, closeSync, readFileSync, writeFileSync } from "nod
 
 export const TRACE_VERSION = 1;
 
-export type SeedStrategy = "scoped-prng" | "none";
+export type SeedStrategy = "scoped-prng" | "global-random-patch" | "none";
 export type StateSource = "dom" | "adapter";
 
 export interface TraceHeader {

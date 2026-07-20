@@ -146,8 +146,11 @@ export function parseSpec(specName: string, source: string): GameSpec {
   }
 
   const seedStrategy = requireString(specName, raw, "seed_strategy");
-  if (seedStrategy !== "scoped-prng" && seedStrategy !== "none") {
-    fail(specName, `"seed_strategy" must be "scoped-prng" or "none", got "${seedStrategy}"`);
+  if (seedStrategy !== "scoped-prng" && seedStrategy !== "global-random-patch" && seedStrategy !== "none") {
+    fail(
+      specName,
+      `"seed_strategy" must be "scoped-prng", "global-random-patch", or "none", got "${seedStrategy}"`,
+    );
   }
   const stateSource = requireString(specName, raw, "state_source");
   if (stateSource !== "dom" && stateSource !== "adapter") {
