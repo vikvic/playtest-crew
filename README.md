@@ -4,6 +4,12 @@ An automated playtesting harness for browser games. An agent plays the game insi
 
 v0 scope: one game (a seeded fork of [2048](https://github.com/gabrielecirulli/2048)), one Explorer agent, CLI only. TypeScript + [Bun](https://bun.com), [Playwright](https://playwright.dev) for browser control.
 
+## Demo
+
+[`docs/demo/explorer-2048-local-llm.webm`](docs/demo/explorer-2048-local-llm.webm) — 35 seconds, 60 actions, seed 7. The Explorer driver playing 2048 end-to-end against a **local** model (`llama3.2` via Ollama, `--llm-provider openai-compatible` — no API key, no per-token cost). This is the exact recording a real run produces (Playwright headed-mode capture), not a staged screencast; [`explorer-2048-local-llm.llm.jsonl`](docs/demo/explorer-2048-local-llm.llm.jsonl) alongside it has the model's stated reasoning for every one of the 60 moves. Result: 0 random fallbacks, 51/60 distinct states reached.
+
+Reproduce it: `bun src/cli.ts run --game 2048 --driver explorer --llm-provider openai-compatible --seed 7 --max-actions 60 --gap 200 --headed`
+
 ## Quickstart
 
 ```bash
