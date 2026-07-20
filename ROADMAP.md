@@ -127,6 +127,28 @@ the CI replay smoke deferred from W2.
 - `hunt --llm-provider`/`--llm-model`: closed a gap where `hunt` only ever
   passed `--driver` to `run()`, silently defaulting every explorer sweep to
   Anthropic — a local-model hunt had no way to select its provider.
+- **SDK adoption model** ([sdk/README.md](../sdk/README.md)): the fork
+  model (`docs/PORTING.md`) requires vendoring the game, hand-patching
+  every `Math.random()` call site, and writing a bespoke state adapter —
+  too much integration cost to expect from a game developer who isn't
+  already invested in this project. The SDK model cuts that to one script
+  tag (`sdk/ptc-sdk.js`) plus one call (`PTC.exposeState(fn)`):
+  - `seed_strategy: global-random-patch` (`src/prng.ts`) overwrites
+    `Math.random` globally via the harness's existing `addInitScript`
+    mechanism — the game's source is never touched for determinism.
+  - `src/games/sdk.ts`'s `sdkGameHooks({name, dir})` supplies
+    `waitUntilReady`/`readState` generically (identical to what 2048's
+    hand-written hooks already did — 2048 itself was refactored onto this
+    factory, no behavior change, confirmed by its baseline still replaying
+    3/3 after the refactor).
+  - `browser.ts` now serves `sdk/ptc-sdk.js` at a fixed URL
+    (`/__ptc_sdk__/ptc-sdk.js`) for every registered game, so nothing needs
+    vendoring into the game's own directory.
+  - **Proof:** `games/dice-demo` — a from-scratch turn-based game with no
+    playtest-crew-specific code beyond one `exposeState()` call — runs,
+    replays 3/3, and hunts cleanly through the unmodified pipeline
+    (`run`/`replay`/`verify`/`hunt` all work; only `GameConfig` matters to
+    them, not how a game implements it).
 
 ## Post-v0
 

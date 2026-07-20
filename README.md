@@ -287,15 +287,19 @@ For speed, `--gap 0 --screenshot-every 0` removes all artificial delay; for a tu
 
 ## Porting to another game
 
-**Full step-by-step guide: [docs/PORTING.md](docs/PORTING.md)** — every step points at the 2048 files as the worked example.
+Two integration paths, depending on how much access you have to the game's source and how much of it you're willing to touch:
 
-The harness is game-agnostic; a game plugs in via a `GameConfig` (`src/games/types.ts`, ~30 lines — see `src/games/g2048.ts`), registered in `src/games/index.ts`: file location, viewport, legal actions, `waitUntilReady`, and a `readState`. The real porting cost is elsewhere:
+**The SDK path (low effort, zero call-site changes): [sdk/README.md](sdk/README.md).** Add one script tag, call `window.PTC.exposeState(() => state)`, set `seed_strategy: global-random-patch` in the spec — the harness overwrites `Math.random` globally instead of requiring every random call site to be hand-patched, and `src/games/sdk.ts`'s generic hooks factory means **zero bespoke TypeScript**. `games/dice-demo` is a from-scratch worked example, proven to `run`/`replay`/`hunt` through the full pipeline.
+
+**The fork path (full control, needed for non-`Math.random` entropy): [docs/PORTING.md](docs/PORTING.md).** Every step points at the 2048 files as the worked example.
+
+The harness is game-agnostic either way; a game plugs in via a `GameConfig` (`src/games/types.ts`, ~30 lines), registered in `src/games/index.ts`: file location, viewport, legal actions, `waitUntilReady`, and a `readState`. Under the fork path, the real porting cost is elsewhere:
 
 1. **State extraction** — the game must expose a JSON-serializable state snapshot (`window.__ptc_state()`). Easy with source access; painful without.
 2. **Determinism** — every `Math.random()` call site that affects gameplay must route through `(window.__ptc_rng || Math.random)()`. 2048 had exactly two. Games with physics, `Date.now()` dependencies, or animation-frame-sensitive logic are where replay fidelity gets hard — which is why W2 starts with replay-fidelity **spikes** on candidate games (vendor, patch, record 60 actions, replay 3×) to disqualify bad fits in 30 minutes instead of a lost weekend.
 3. **The spec** — `specs/<game>.yaml`: action descriptions, budgets, invariants, `terminal_states`, and `state_notes` explaining any non-obvious state encoding (2048's grid is column-major; without that note the explorer misread the board). A short explorer run with a look at `llm.jsonl` will tell you whether the model understands your state format.
 
-A simple deterministic DOM/keyboard game ports in under an hour. Most of the config is declarative via the YAML spec; the code hooks (`src/games/<game>.ts`) are ~20 lines.
+A simple deterministic DOM/keyboard game ports in under an hour either way; the SDK path collapses most of that hour into the one `exposeState` call.
 
 ## Playing 2048 yourself
 

@@ -1,8 +1,16 @@
 # Porting a game to the harness
 
-This is the complete checklist for adding a new game, with the existing 2048
-integration as the worked example for every step. Budget for a simple
-deterministic DOM/keyboard game: under an hour.
+This is the complete checklist for adding a new game via the **fork
+model**, with the existing 2048 integration as the worked example for
+every step. Budget for a simple deterministic DOM/keyboard game: under an
+hour.
+
+If the game only needs `Math.random()` for its entropy (no
+`crypto.getRandomValues`, no `Date.now()`-seeded logic), the **SDK
+model** ([sdk/README.md](../sdk/README.md)) gets you the same
+`run`/`replay`/`verify`/`hunt` pipeline with zero call-site RNG patching
+and zero bespoke TypeScript — worth checking before starting the checklist
+below.
 
 ## How the harness "sees" a game (read this first)
 
