@@ -1,7 +1,8 @@
 /**
- * Provider-agnostic LLMClient seam (CLAUDE.md mandate). Anthropic and
- * OpenAI-compatible (vLLM, Ollama, any /v1/chat/completions gateway) ship
- * here; Gemini is still post-v0 (TODOS.md #1) — copy either shape.
+ * Provider-agnostic LLMClient seam (CLAUDE.md mandate). Anthropic,
+ * OpenAI-compatible (vLLM, Ollama, any /v1/chat/completions gateway), and
+ * Gemini all ship here — CLAUDE.md's provider-agnostic mandate is now
+ * fully satisfied, not just satisfied by interface.
  *
  * The seam is deliberately tiny: one completion call with a stable system
  * prompt, a per-turn user prompt, and an optional JSON schema the response
@@ -198,6 +199,84 @@ export class OpenAICompatibleClient implements LLMClient {
             ? {
                 inputTokens: json.usage.prompt_tokens ?? 0,
                 outputTokens: json.usage.completion_tokens ?? 0,
+                cacheReadInputTokens: 0,
+              }
+            : undefined,
+        };
+      } catch (e) {
+        lastError = e;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+}
+
+export const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+
+/**
+ * Gemini's REST `generateContent` endpoint. No SDK dependency, same
+ * reasoning as OpenAICompatibleClient: the wire format is small and stable
+ * enough that `fetch` is simpler than adding one. Structured output is
+ * enforced server-side via `generationConfig.responseSchema` (Gemini's
+ * schema dialect is close enough to standard JSON Schema for the
+ * alphabet-enum shape the explorer sends — anything it rejects still
+ * degrades safely through the explorer's client-side fallback).
+ */
+export class GeminiClient implements LLMClient {
+  readonly name: string;
+  private readonly baseUrl: string;
+  private readonly apiKey: string;
+  private readonly model: string;
+
+  constructor(opts: { model?: string; baseUrl?: string; apiKey?: string } = {}) {
+    this.model = opts.model ?? process.env.PTC_MODEL ?? DEFAULT_GEMINI_MODEL;
+    this.baseUrl = (opts.baseUrl ?? process.env.PTC_BASE_URL ?? DEFAULT_GEMINI_BASE_URL).replace(/\/+$/, "");
+    const apiKey = opts.apiKey ?? process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GeminiClient: GEMINI_API_KEY is required (no default — Gemini has no local server mode)");
+    this.apiKey = apiKey;
+    this.name = `gemini:${this.model}`;
+  }
+
+  async complete(req: CompletionRequest): Promise<CompletionResult> {
+    const body: Record<string, unknown> = {
+      systemInstruction: { parts: [{ text: req.system }] },
+      contents: [{ role: "user", parts: [{ text: req.user }] }],
+      generationConfig: {
+        maxOutputTokens: req.maxTokens ?? 300,
+        ...(req.schema ? { responseMimeType: "application/json", responseSchema: req.schema } : {}),
+      },
+    };
+
+    let lastError: unknown;
+    // Same retry contract as the other clients: exhausted retries propagate,
+    // and the runner reports harness-error, not a game bug.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(
+          `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        if (!res.ok) {
+          throw new Error(`${this.name}: HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}`);
+        }
+        const json = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+          usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+        };
+        const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+        if (text === "") throw new Error(`${this.name}: empty completion`);
+        return {
+          text,
+          usage: json.usageMetadata
+            ? {
+                inputTokens: json.usageMetadata.promptTokenCount ?? 0,
+                outputTokens: json.usageMetadata.candidatesTokenCount ?? 0,
                 cacheReadInputTokens: 0,
               }
             : undefined,

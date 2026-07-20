@@ -1,5 +1,10 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { OpenAICompatibleClient, DEFAULT_OPENAI_COMPATIBLE_BASE_URL } from "../src/llm.ts";
+import {
+  OpenAICompatibleClient,
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  GeminiClient,
+  DEFAULT_GEMINI_BASE_URL,
+} from "../src/llm.ts";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -116,5 +121,69 @@ describe("OpenAICompatibleClient.checkModelAvailable", () => {
       throw new Error("connect ECONNREFUSED");
     }) as unknown as typeof fetch;
     await new OpenAICompatibleClient({ model: "llama3.2" }).checkModelAvailable();
+  });
+});
+
+describe("GeminiClient", () => {
+  test("requires an API key — no default, unlike the local providers", () => {
+    const savedKey = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    expect(() => new GeminiClient()).toThrow("GEMINI_API_KEY is required");
+    if (savedKey !== undefined) process.env.GEMINI_API_KEY = savedKey;
+  });
+
+  test("posts system/user content and a responseSchema to generateContent", async () => {
+    let seenUrl = "";
+    let body: Record<string, unknown> = {};
+    fakeFetch((url, init) => {
+      seenUrl = url;
+      body = JSON.parse(init.body as string);
+      return new Response(
+        JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }),
+      );
+    });
+    const schema = { type: "object", properties: { action: { enum: ["ArrowLeft"] } } };
+    const client = new GeminiClient({ model: "gemini-2.5-flash", apiKey: "k" });
+    await client.complete({ system: "sys", user: "usr", schema, maxTokens: 50 });
+    expect(seenUrl).toBe(`${DEFAULT_GEMINI_BASE_URL}/models/gemini-2.5-flash:generateContent?key=k`);
+    expect(body.systemInstruction).toEqual({ parts: [{ text: "sys" }] });
+    expect(body.contents).toEqual([{ role: "user", parts: [{ text: "usr" }] }]);
+    expect(body.generationConfig).toEqual({
+      maxOutputTokens: 50,
+      responseMimeType: "application/json",
+      responseSchema: schema,
+    });
+  });
+
+  test("parses text and usage from the Gemini-shaped response", async () => {
+    fakeFetch(() =>
+      new Response(
+        JSON.stringify({
+          candidates: [{ content: { parts: [{ text: `{"action":"ArrowLeft","why":"x"}` }] } }],
+          usageMetadata: { promptTokenCount: 30, candidatesTokenCount: 8 },
+        }),
+      ),
+    );
+    const client = new GeminiClient({ apiKey: "k" });
+    const result = await client.complete({ system: "s", user: "u" });
+    expect(result.text).toBe(`{"action":"ArrowLeft","why":"x"}`);
+    expect(result.usage).toEqual({ inputTokens: 30, outputTokens: 8, cacheReadInputTokens: 0 });
+  });
+
+  test("a non-OK response is retried, then throws once retries are exhausted", async () => {
+    let calls = 0;
+    fakeFetch(() => {
+      calls += 1;
+      return new Response("server error", { status: 500 });
+    });
+    const client = new GeminiClient({ apiKey: "k" });
+    await expect(client.complete({ system: "s", user: "u" })).rejects.toThrow("HTTP 500");
+    expect(calls).toBe(3);
+  });
+
+  test("an empty completion is treated as a failure", async () => {
+    fakeFetch(() => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "" }] } }] })));
+    const client = new GeminiClient({ apiKey: "k" });
+    await expect(client.complete({ system: "s", user: "u" })).rejects.toThrow("empty completion");
   });
 });

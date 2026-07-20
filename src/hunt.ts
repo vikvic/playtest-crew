@@ -23,7 +23,7 @@ export interface HuntOptions {
   driverName?: string;
   maxActions?: number;
   /** Explorer only: which LLMClient to build. Default "anthropic". */
-  llmProvider?: "anthropic" | "openai-compatible";
+  llmProvider?: "anthropic" | "openai-compatible" | "gemini";
   /** Explorer only: overrides PTC_MODEL for every seed in the sweep. */
   llmModel?: string;
   /** Replays per candidate (default 3, the finding bar). */

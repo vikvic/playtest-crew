@@ -48,28 +48,41 @@ function usage(): never {
 Commands:
   playtest run    --game 2048 [--driver random|explorer] [--out runs/<ts>] [--seed 42]
                   [--max-actions N] [--screenshot-every N] [--gap 120] [--headed]
-                  [--llm-provider anthropic|openai-compatible] [--llm-model NAME]
+                  [--llm-provider anthropic|openai-compatible|gemini] [--llm-model NAME]
                   (budget defaults come from specs/<game>.yaml; explorer:
                    anthropic needs ANTHROPIC_API_KEY (model default claude-opus-4-8);
                    openai-compatible talks to PTC_BASE_URL (default a local Ollama
                    at http://localhost:11434/v1, model default llama3.2) — no
-                   API key needed for a local server. --llm-model overrides
+                   API key needed for a local server; gemini needs GEMINI_API_KEY
+                   (model default gemini-2.5-flash). --llm-model overrides
                    PTC_MODEL for this run either way.)
   playtest verify --run <run-dir> | --finding <bundle-dir> [--times 3]
                   (replay each candidate's cut trace; finding = same oracle
                    refires within ±3 actions on EVERY replay, else flake)
   playtest hunt   --game 2048 --seeds 1-20 [--driver random|explorer]
-                  [--llm-provider anthropic|openai-compatible] [--llm-model NAME]
+                  [--llm-provider anthropic|openai-compatible|gemini] [--llm-model NAME]
                   [--max-actions N] [--out runs/hunt-<ts>] [--times 3]
                   (unattended sweep: run every seed, verify every candidate,
                    write report.md + report.json; --llm-provider/--llm-model
                    apply to every seed in the sweep)
+  playtest bench  --game 2048 --seed 7 --max-actions 60 --models "openai-compatible:llama3.2,openai-compatible:qwen2.5:7b-instruct"
+                  (run the explorer with each provider:model pair on the same
+                   seed/budget, write bench.md + bench.json comparing
+                   distinct-state coverage, fallback rate, and call latency)
   playtest replay --trace <path> [--times 1] [--headed]
   playtest rebaseline --game 2048 [--seed 42] [--max-actions 60]
                   (re-records baselines/<game>/trace.jsonl against the current
                    adapter; only replaces it after a 3/3 replay verification)
 `);
   process.exit(2);
+}
+
+function parseLlmProvider(value: string | undefined): "anthropic" | "openai-compatible" | "gemini" {
+  if (value !== "anthropic" && value !== "openai-compatible" && value !== "gemini") {
+    console.error(`--llm-provider must be "anthropic", "openai-compatible", or "gemini", got "${value}"`);
+    process.exit(2);
+  }
+  return value;
 }
 
 function printVerdict(v: import("./verify.ts").BundleVerdict): void {
@@ -110,12 +123,7 @@ if (command === "run") {
     console.error(`--driver must be "random" or "explorer", got "${values.driver}"`);
     process.exit(2);
   }
-  if (values["llm-provider"] !== "anthropic" && values["llm-provider"] !== "openai-compatible") {
-    console.error(
-      `--llm-provider must be "anthropic" or "openai-compatible", got "${values["llm-provider"]}"`,
-    );
-    process.exit(2);
-  }
+  const llmProvider = parseLlmProvider(values["llm-provider"]);
   const summary = await run({
     game: values.game!,
     out,
@@ -125,7 +133,7 @@ if (command === "run") {
       values["screenshot-every"] === undefined ? undefined : Number(values["screenshot-every"]),
     actionGapMs: Number(values.gap),
     driverName: values.driver,
-    llmProvider: values["llm-provider"] as "anthropic" | "openai-compatible",
+    llmProvider,
     llmModel: values["llm-model"],
     headed: values.headed,
   });
@@ -189,12 +197,7 @@ if (command === "run") {
     console.error(`--driver must be "random" or "explorer", got "${values.driver}"`);
     process.exit(2);
   }
-  if (values["llm-provider"] !== "anthropic" && values["llm-provider"] !== "openai-compatible") {
-    console.error(
-      `--llm-provider must be "anthropic" or "openai-compatible", got "${values["llm-provider"]}"`,
-    );
-    process.exit(2);
-  }
+  const huntLlmProvider = parseLlmProvider(values["llm-provider"]);
   const { hunt, parseSeeds } = await import("./hunt.ts");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const report = await hunt({
@@ -202,7 +205,7 @@ if (command === "run") {
     seeds: parseSeeds(values.seeds),
     out: values.out ?? join("runs", `hunt-${stamp}`),
     driverName: values.driver,
-    llmProvider: values["llm-provider"] as "anthropic" | "openai-compatible",
+    llmProvider: huntLlmProvider,
     llmModel: values["llm-model"],
     maxActions: values["max-actions"] === undefined ? undefined : Number(values["max-actions"]),
     times: Number(values.times),

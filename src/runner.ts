@@ -26,7 +26,7 @@ import { mulberry32 } from "./prng.ts";
 import { step, type GameSession } from "./executor.ts";
 import { OracleEngine, type OracleFire } from "./oracles.ts";
 import { explorerDriver, type ExplorerStats } from "./explorer.ts";
-import { AnthropicClient, OpenAICompatibleClient, type LLMClient } from "./llm.ts";
+import { AnthropicClient, OpenAICompatibleClient, GeminiClient, type LLMClient } from "./llm.ts";
 import { TraceWriter, cutTrace, writeTraceFile, type TraceHeader, type TraceLine } from "./trace.ts";
 
 export interface RunOptions {
@@ -42,7 +42,7 @@ export interface RunOptions {
   driver?: Driver;
   driverName?: string;
   /** Explorer only: which LLMClient to build. Default "anthropic". */
-  llmProvider?: "anthropic" | "openai-compatible";
+  llmProvider?: "anthropic" | "openai-compatible" | "gemini";
   /** Explorer only: overrides PTC_MODEL for this run. */
   llmModel?: string;
   /** Disable video recording (rebaseline wants a lean, fast run). */
@@ -124,6 +124,8 @@ export async function run(opts: RunOptions): Promise<RunSummary> {
         const client = new OpenAICompatibleClient({ model: opts.llmModel });
         await client.checkModelAvailable(); // fail fast, before the browser ever launches
         llmClient = client;
+      } else if (opts.llmProvider === "gemini") {
+        llmClient = new GeminiClient({ model: opts.llmModel });
       } else {
         llmClient = new AnthropicClient({ model: opts.llmModel });
       }

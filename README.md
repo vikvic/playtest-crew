@@ -67,7 +67,7 @@ see [Development](#development).
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `--driver <name>` | random | `random` (seeded walker) or `explorer` (LLM) |
-| `--llm-provider <name>` | anthropic | `anthropic` (needs `ANTHROPIC_API_KEY`, model default `claude-opus-4-8`) or `openai-compatible` (any `/v1/chat/completions` server — Ollama, vLLM, gateways; model default `llama3.2`, base URL default `http://localhost:11434/v1` via `PTC_BASE_URL`, no API key needed for a local server) |
+| `--llm-provider <name>` | anthropic | `anthropic` (needs `ANTHROPIC_API_KEY`, model default `claude-opus-4-8`); `openai-compatible` (any `/v1/chat/completions` server — Ollama, vLLM, gateways; model default `llama3.2`, base URL default `http://localhost:11434/v1` via `PTC_BASE_URL`, no API key needed for a local server); or `gemini` (needs `GEMINI_API_KEY`, model default `gemini-2.5-flash`) |
 | `--llm-model <name>` | provider default | Overrides `PTC_MODEL` for this run |
 | `--seed <n>` | 42 | Deterministic seed (game PRNG + move driver) |
 | `--max-actions <n>` | spec | Action budget per run (default from `specs/<game>.yaml`) |
