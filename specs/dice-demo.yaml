@@ -1,0 +1,44 @@
+# Game spec for games/dice-demo — the SDK adoption proof (see sdk/README.md
+# and src/games/sdk.ts). Unlike specs/2048.yaml, the game behind this spec
+# has ZERO harness-specific code: no patched RNG call sites, no readState
+# adapter beyond the one PTC.exposeState() call in its own index.html.
+
+game: "dice-demo"
+entry: index.html
+viewport: { w: 480, h: 200 }
+
+# The whole point of this integration: Math.random() is never touched by
+# the game itself. The harness overwrites it globally before any game
+# script runs (src/prng.ts) — zero call-site changes required.
+seed_strategy: global-random-patch
+state_source: adapter
+adapter_version: dice-demo@1
+
+state_notes: >
+  { rolls: number[] (each 2-12, one per Enter press), total: number
+  (starting bonus + sum of rolls), target: number (fixed at 50), over:
+  boolean (true once total >= target; further rolls are no-ops) }.
+
+actions:
+  - key: Enter
+    description: Roll two dice and add them to the running total.
+
+budgets:
+  max_actions: 60
+  screenshot_every: 0
+  max_verifications: 5
+
+oracles:
+  console_errors: true
+  hang:
+    unchanged_actions: 5
+  invariants:
+    - name: total-non-negative
+      expr: state.total >= 0
+    - name: rolls-in-range
+      expr: state.rolls.every(r => r >= 2 && r <= 12)
+
+# Once the game is over, further Enter presses are no-ops by design — not
+# a hang. Same role as 2048's terminal_states.
+terminal_states:
+  - state.over === true

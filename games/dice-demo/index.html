@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PTC SDK demo: dice race</title>
+<script src="/__ptc_sdk__/ptc-sdk.js"></script>
+</head>
+<body>
+<div id="app">loading…</div>
+<script>
+  // A trivial turn-based game proving the SDK adoption model (see
+  // sdk/ptc-sdk.js and specs/dice-demo.yaml): press Enter to roll two dice,
+  // race to the target score. There is NO per-call-site RNG patching here
+  // and no adapter code beyond this one file -- Math.random() is called
+  // exactly the way it would be in a game that had never heard of
+  // playtest-crew. Determinism comes entirely from the harness's
+  // seed_strategy: global-random-patch (src/prng.ts), and state exposure
+  // is the one PTC.exposeState() call at the bottom.
+  var state = {
+    rolls: [],
+    total: Math.floor(Math.random() * 5), // seed-dependent starting bonus
+    target: 50,
+    over: false,
+  };
+
+  function render() {
+    document.getElementById("app").textContent =
+      "total " + state.total + " / " + state.target +
+      " (rolls: " + state.rolls.length + ")" +
+      (state.over ? " -- GAME OVER" : "");
+  }
+
+  function roll() {
+    if (state.over) return; // inapplicable once over -- a harmless no-op
+    var d = Math.floor(Math.random() * 6) + 1 + Math.floor(Math.random() * 6) + 1;
+    state.rolls.push(d);
+    state.total += d;
+    if (state.total >= state.target) state.over = true;
+    render();
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") roll();
+  });
+
+  window.PTC.exposeState(function () {
+    return state;
+  });
+  render();
+</script>
+</body>
+</html>

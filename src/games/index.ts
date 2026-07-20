@@ -1,9 +1,17 @@
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { GameConfig, GameHooks } from "./types.ts";
 import { g2048 } from "./g2048.ts";
+import { sdkGameHooks } from "./sdk.ts";
 import { loadSpec } from "../spec.ts";
+
+const GAMES_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "games");
 
 const hooksRegistry: Record<string, GameHooks> = {
   "2048": g2048,
+  // Zero bespoke TypeScript — proves the sdk.ts adoption path (see
+  // sdk/ptc-sdk.js, specs/dice-demo.yaml, games/dice-demo/index.html).
+  "dice-demo": sdkGameHooks({ name: "dice-demo", dir: join(GAMES_ROOT, "dice-demo") }),
 };
 
 /**
