@@ -72,7 +72,7 @@ instead of DOM; oracle validated via a temporary planted bug (reverted).
 - Demand checkpoint (non-code, founder task): check replies to the outreach
   batch; the reply-calibrated kill-switch decision is overdue from end of W2.
 
-## W4 — in progress
+## W4 — done (code + shipping deliverables)
 
 Per spec.md, W4 is the shipping weekend, not more infrastructure: README
 demo video, one upstream bug filed, repo public, first build-log post, plus
@@ -83,20 +83,29 @@ the CI replay smoke deferred from W2.
   a cloud-API-only explorer makes the demo expensive to run and hands
   nobody else a way to try it cheaply — fix the cost/friction problem
   before spending the weekend on outreach artifacts that depend on it.
-- **Done:** `OpenAICompatibleClient` (`src/llm.ts`) — talks to any
+- Local LLM support: `OpenAICompatibleClient` (`src/llm.ts`) — talks to any
   `/v1/chat/completions` server (Ollama, vLLM, hosted gateways); `--driver
   explorer --llm-provider openai-compatible` on the CLI, model/base-URL
   configurable via `--llm-model` / `PTC_BASE_URL` / `PTC_API_KEY`. Same
   fallback contract as Anthropic (unusable response → seeded random pick,
-  exhausted retries → harness-error). Smoke-tested against local
-  `llama3.2` (Ollama 0.6.7) on 2048: 20/20 calls resolved, 0 fallbacks,
-  18/20 distinct states in 20 actions, structured output enforced
-  server-side via `response_format: json_schema`.
+  exhausted retries → harness-error). Structured output enforced
+  server-side via `response_format: json_schema`, same as Anthropic's
+  structured outputs — the Explorer driver needed zero changes.
+- CI (`.github/workflows/ci.yml`): typecheck, unit tests, then a 3× replay
+  of the checked-in `baselines/2048/trace.jsonl` on every push/PR — the
+  automated version of what `rebaseline` already checks by hand.
+- Demo video (`docs/demo/explorer-2048-local-llm.webm` +
+  matching `.llm.jsonl`): 60-action, 35s real run against local `llama3.2`
+  — 0 random fallbacks, 51/60 distinct states. The harness's own
+  Playwright headed-mode recording, not a staged screencast; embedded in
+  the README with the exact repro command.
+- First build-log post (`docs/buildlog/2026-07-20-four-weekends.md`),
+  linked from the README.
 - **Repo visibility:** held private for now (explicit call — not yet ready
   to make public).
-- **Still open:** demo video (via browser automation), build-log post
-  (markdown, in-repo), CI replay smoke, upstream bug filing (deferred, not
-  cancelled — revisit once local-LLM makes the harness cheap to hand out).
+- **Deferred, not cancelled:** upstream bug filing on real 2048 — revisit
+  once the local-LLM path makes the harness cheap to hand out for anyone
+  to reproduce a report against.
 
 ## Post-v0
 
