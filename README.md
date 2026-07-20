@@ -288,4 +288,8 @@ bunx tsc --noEmit   # typecheck
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the W1–W3 plan; post-v0 deferrals live in [TODOS.md](TODOS.md).
+See [ROADMAP.md](ROADMAP.md) for the W1–W4 plan; post-v0 deferrals live in [TODOS.md](TODOS.md).
+
+## Build log
+
+[docs/buildlog/2026-07-20-four-weekends.md](docs/buildlog/2026-07-20-four-weekends.md) — how the four weekends actually went, including the bugs found along the way.
