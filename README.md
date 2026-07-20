@@ -10,46 +10,57 @@ v0 scope: one game (a seeded fork of [2048](https://github.com/gabrielecirulli/2
 
 Reproduce it: `bun src/cli.ts run --game 2048 --driver explorer --llm-provider openai-compatible --seed 7 --max-actions 60 --gap 200 --headed`
 
-## Quickstart
+## Golden path
+
+The sequence below is the actual order to go from zero to an unattended bug
+hunt — free, local, no API key. Each step is a real command that was run
+end-to-end while writing this README, not aspirational.
 
 ```bash
+# 0. install
 bun install
 
-# run a playtest (headless by default, seeded random driver)
+# 1. pull a local model (any Ollama model works; qwen2.5:7b-instruct measured
+#    better exploration coverage than llama3.2 on this game — see step 3)
+ollama pull llama3.2
+
+# 2. sanity-check the harness with the seeded random driver first —
+#    zero LLM involved, confirms the browser/executor/trace path works
 bun src/cli.ts run --game 2048
 
-# let the LLM explorer play instead (needs ANTHROPIC_API_KEY in .env)
-bun src/cli.ts run --game 2048 --driver explorer
+# 3. let the local model play instead. A wrong/missing model name fails
+#    immediately with an `ollama pull` hint, before the browser even opens.
+bun src/cli.ts run --game 2048 --driver explorer --llm-provider openai-compatible --llm-model llama3.2
 
-# ...or point it at a local model instead — no API key, no per-token cost.
-# Works with any OpenAI-compatible server (Ollama shown; vLLM too).
-ollama pull llama3.2
-bun src/cli.ts run --game 2048 --driver explorer --llm-provider openai-compatible
+# 3b. compare models on the same seed/budget — bigger/smarter isn't always
+#     better (see "How moves are decided"); this is how you'd measure it
+ollama pull qwen2.5:7b-instruct
+bun src/cli.ts run --game 2048 --driver explorer --llm-provider openai-compatible --llm-model qwen2.5:7b-instruct --seed 7 --max-actions 60
 
-# LLM-driven run, capped at 30 steps, with reasoning + video recorded:
-#   video/*.webm        — the full run
-#   llm.jsonl           — one line per step: state seen, chosen action,
-#                         the model's reasoning ("why"), token usage, and
-#                         a videoTs offset to scrub the video to that moment
-bun src/cli.ts run --game 2048 --driver explorer --max-actions 30
+# 4. watch it decide, on video: headed mode + the per-step reasoning log
+#   video/*.webm  — the full run (Playwright's own recording)
+#   llm.jsonl     — one line per step: state seen, chosen action, the
+#                   model's stated reasoning ("why"), token usage, and a
+#                   videoTs offset to scrub the video to that moment
+bun src/cli.ts run --game 2048 --driver explorer --llm-provider openai-compatible --max-actions 60 --gap 200 --headed
 
-# watch the bot play
-bun src/cli.ts run --game 2048 --headed
-
-# replay a recorded trace 3 times and verify determinism
+# 5. replay a recorded trace 3 times and verify determinism
 bun src/cli.ts replay --trace runs/<name>/trace.jsonl --times 3
 
-# judge a run's candidates: replay each cut trace 3x — same oracle must
-# refire every time (within ±3 actions) to earn "finding", else it's a flake
+# 6. judge a run's candidates: replay each cut trace 3x — same oracle must
+#    refire every time (within ±3 actions) to earn "finding", else it's a flake
 bun src/cli.ts verify --run runs/<name>
 
-# unattended bug hunt: sweep seeds, auto-verify every candidate,
-# write report.md + report.json
-bun src/cli.ts hunt --game 2048 --seeds 1-20
-
-# re-record + 3/3-verify the checked-in CI baseline after any adapter change
-bun src/cli.ts rebaseline --game 2048
+# 7. the payoff: an unattended, zero-API-cost bug hunt against the local
+#    model, sweeping many seeds and auto-verifying every candidate
+bun src/cli.ts hunt --game 2048 --seeds 1-20 --driver explorer --llm-provider openai-compatible --llm-model qwen2.5:7b-instruct
 ```
+
+Prefer a cloud model instead? Every step above works the same way with
+`--llm-provider anthropic` (the default) and `ANTHROPIC_API_KEY` set — see
+the flags table below. `rebaseline` (re-records + 3/3-verifies the
+checked-in CI baseline after an adapter change) isn't part of this path;
+see [Development](#development).
 
 `run` flags:
 
@@ -284,6 +295,9 @@ Open `games/2048/index.html` directly in a browser — without the harness, `win
 ```bash
 bun test            # unit tests (hash, PRNG, trace, executor)
 bunx tsc --noEmit   # typecheck
+
+# re-record + 3/3-verify the checked-in CI baseline after any adapter change
+bun src/cli.ts rebaseline --game 2048
 ```
 
 **Windows note:** Bun cannot complete Playwright's Chromium launch handshake on win32 ([oven-sh/bun#27977](https://github.com/oven-sh/bun/issues/27977)), so `src/cli.ts` transparently re-execs itself under Node (≥ 23.6, for native TS type stripping) on Windows. All modules are runtime-agnostic (`node:crypto`/`node:fs`/`node:http`, explicit `.ts` import extensions) so both runtimes work; Linux/CI stays pure Bun.
