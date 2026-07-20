@@ -15,6 +15,11 @@ bun src/cli.ts run --game 2048
 # let the LLM explorer play instead (needs ANTHROPIC_API_KEY in .env)
 bun src/cli.ts run --game 2048 --driver explorer
 
+# ...or point it at a local model instead — no API key, no per-token cost.
+# Works with any OpenAI-compatible server (Ollama shown; vLLM too).
+ollama pull llama3.2
+bun src/cli.ts run --game 2048 --driver explorer --llm-provider openai-compatible
+
 # LLM-driven run, capped at 30 steps, with reasoning + video recorded:
 #   video/*.webm        — the full run
 #   llm.jsonl           — one line per step: state seen, chosen action,
@@ -44,7 +49,9 @@ bun src/cli.ts rebaseline --game 2048
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--driver <name>` | random | `random` (seeded walker) or `explorer` (LLM; model via `PTC_MODEL`, default `claude-opus-4-8`) |
+| `--driver <name>` | random | `random` (seeded walker) or `explorer` (LLM) |
+| `--llm-provider <name>` | anthropic | `anthropic` (needs `ANTHROPIC_API_KEY`, model default `claude-opus-4-8`) or `openai-compatible` (any `/v1/chat/completions` server — Ollama, vLLM, gateways; model default `llama3.2`, base URL default `http://localhost:11434/v1` via `PTC_BASE_URL`, no API key needed for a local server) |
+| `--llm-model <name>` | provider default | Overrides `PTC_MODEL` for this run |
 | `--seed <n>` | 42 | Deterministic seed (game PRNG + move driver) |
 | `--max-actions <n>` | spec | Action budget per run (default from `specs/<game>.yaml`) |
 | `--gap <ms>` | 120 | Pacing between actions (`0` = as fast as the harness can go) |
@@ -90,7 +97,7 @@ A run only ever produces **candidates**. `verify` (per run or per bundle) replay
 Two drivers, selected with `--driver`; everything downstream (trace, hashing, replay, oracles) is driver-blind.
 
 - **`random`** (default): a seeded Mulberry32 walker (seeded `seed ^ 0x9e3779b9`, distinct from the game's tile-spawn PRNG) picks uniformly from the action alphabet. Same seed → same move sequence — the determinism baseline, and the coverage baseline the explorer must beat.
-- **`explorer`** (W2): each step, the LLM sees the serialized game state, the described action alphabet, and its recent actions annotated with whether each one changed anything, and returns the next action through a provider-agnostic `LLMClient` (`src/llm.ts`; Anthropic impl in v0, choice constrained server-side via a JSON-schema enum, stable system prompt cached). An unusable response falls back to a seeded random pick (counted in the summary); an API failure that survives retries ends the run as harness-error.
+- **`explorer`** (W2): each step, the LLM sees the serialized game state, the described action alphabet, and its recent actions annotated with whether each one changed anything, and returns the next action through a provider-agnostic `LLMClient` (`src/llm.ts`: Anthropic, and `OpenAICompatibleClient` for any local/self-hosted `/v1/chat/completions` server, W4), choice constrained server-side via a JSON-schema enum, stable system prompt cached where the provider supports it. An unusable response falls back to a seeded random pick (counted in the summary); an API failure that survives retries ends the run as harness-error.
 
 The success criterion — explorer must cover at least as many distinct states (unique `preStateHash` values) as random on the same budget — is measured in the run summary. First measurement (2048, seed 42, 100 actions): **explorer 83 distinct states vs random 62 (+34%)**, mostly because random burns budget on no-op moves and the explorer avoids them.
 

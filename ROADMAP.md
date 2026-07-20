@@ -72,6 +72,32 @@ instead of DOM; oracle validated via a temporary planted bug (reverted).
 - Demand checkpoint (non-code, founder task): check replies to the outreach
   batch; the reply-calibrated kill-switch decision is overdue from end of W2.
 
+## W4 — in progress
+
+Per spec.md, W4 is the shipping weekend, not more infrastructure: README
+demo video, one upstream bug filed, repo public, first build-log post, plus
+the CI replay smoke deferred from W2.
+
+- **Re-scoped mid-weekend:** the upstream-bug-filing step was pulled in
+  favor of local-LLM support (originally TODOS.md #1, post-v0). Reasoning:
+  a cloud-API-only explorer makes the demo expensive to run and hands
+  nobody else a way to try it cheaply — fix the cost/friction problem
+  before spending the weekend on outreach artifacts that depend on it.
+- **Done:** `OpenAICompatibleClient` (`src/llm.ts`) — talks to any
+  `/v1/chat/completions` server (Ollama, vLLM, hosted gateways); `--driver
+  explorer --llm-provider openai-compatible` on the CLI, model/base-URL
+  configurable via `--llm-model` / `PTC_BASE_URL` / `PTC_API_KEY`. Same
+  fallback contract as Anthropic (unusable response → seeded random pick,
+  exhausted retries → harness-error). Smoke-tested against local
+  `llama3.2` (Ollama 0.6.7) on 2048: 20/20 calls resolved, 0 fallbacks,
+  18/20 distinct states in 20 actions, structured output enforced
+  server-side via `response_format: json_schema`.
+- **Repo visibility:** held private for now (explicit call — not yet ready
+  to make public).
+- **Still open:** demo video (via browser automation), build-log post
+  (markdown, in-repo), CI replay smoke, upstream bug filing (deferred, not
+  cancelled — revisit once local-LLM makes the harness cheap to hand out).
+
 ## Post-v0
 
 Deferred items live in [TODOS.md](TODOS.md).

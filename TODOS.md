@@ -3,11 +3,15 @@
 Source of truth for context: the design doc at
 `~/.gstack/projects/playtest-crew/vic-master-design-20260706-234327.md`.
 
-## 1. OpenAI-compatible + Gemini LLMClient implementations
-- **What:** Ship the two remaining provider impls behind the existing `LLMClient` seam (Anthropic ships in v0/W2).
-- **Why:** CLAUDE.md mandates provider-agnostic; v0 satisfies it by interface only (recorded deviation — see "Constraint reconciliation" in the design doc).
+## 1. Gemini LLMClient implementation
+- **What:** The remaining provider impl behind the existing `LLMClient` seam.
+- **Why:** CLAUDE.md mandates provider-agnostic; Anthropic (v0/W2) and
+  OpenAI-compatible (W4, see ROADMAP.md — covers local models via
+  Ollama/vLLM plus any hosted OpenAI-compatible gateway) now ship; Gemini
+  is the last recorded deviation.
 - **Depends on:** the `LLMClient` seam existing (W2).
-- **Start:** copy the Anthropic impl's shape; OpenAI-compatible first (covers vLLM/Ollama/gateways).
+- **Start:** copy the OpenAI-compatible impl's shape (Gemini's REST API is
+  closer to it than to Anthropic's).
 
 ## 2. `playtest bench` — cross-model comparison command
 - **What:** Same game, same YAML spec, different models; publish the comparison as build-log content.
