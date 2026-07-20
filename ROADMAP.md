@@ -79,7 +79,7 @@ demo video, one upstream bug filed, repo public, first build-log post, plus
 the CI replay smoke deferred from W2.
 
 - **Re-scoped mid-weekend:** the upstream-bug-filing step was pulled in
-  favor of local-LLM support (originally TODOS.md #1, post-v0). Reasoning:
+  favor of local-LLM support (originally a post-v0 TODO). Reasoning:
   a cloud-API-only explorer makes the demo expensive to run and hands
   nobody else a way to try it cheaply — fix the cost/friction problem
   before spending the weekend on outreach artifacts that depend on it.
@@ -106,6 +106,27 @@ the CI replay smoke deferred from W2.
 - **Deferred, not cancelled:** upstream bug filing on real 2048 — revisit
   once the local-LLM path makes the harness cheap to hand out for anyone
   to reproduce a report against.
+
+## Post-v0 (in progress, unblocked after W4's demand checkpoint)
+
+- Gemini `LLMClient` (`src/llm.ts`): fetch-based, same shape as the
+  OpenAI-compatible client. `GEMINI_API_KEY` required — no local-server
+  fallback like the other two providers, so a missing key throws
+  immediately rather than defaulting to anything. CLAUDE.md's
+  provider-agnostic mandate (Anthropic, OpenAI-compatible, Gemini) is now
+  fully satisfied by code, not just by interface.
+- `playtest bench` (`src/bench.ts`): runs the explorer under several
+  `LLMClient` configs on the same game/seed/budget, reports distinct-state
+  coverage, fallback rate, and per-call latency. A model that fails to run
+  (missing key, model not found) is recorded as a `harness-error` row with
+  its error rather than aborting the comparison — same honest-accounting
+  rule as `hunt`. Measured: `qwen2.5:7b-instruct` beat `llama3.2` on
+  coverage (57/60 vs 51/60 distinct states, seed 7) at ~1.25× the per-call
+  latency — confirms the manual comparison done by hand earlier this
+  session, now automated.
+- `hunt --llm-provider`/`--llm-model`: closed a gap where `hunt` only ever
+  passed `--driver` to `run()`, silently defaulting every explorer sweep to
+  Anthropic — a local-model hunt had no way to select its provider.
 
 ## Post-v0
 
