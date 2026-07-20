@@ -81,3 +81,40 @@ describe("OpenAICompatibleClient", () => {
     await expect(client.complete({ system: "s", user: "u" })).rejects.toThrow("empty completion");
   });
 });
+
+describe("OpenAICompatibleClient.checkModelAvailable", () => {
+  test("passes silently when the model is listed exactly", async () => {
+    fakeFetch(() =>
+      new Response(JSON.stringify({ data: [{ id: "llama3.2" }, { id: "llama3" }] })),
+    );
+    await new OpenAICompatibleClient({ model: "llama3.2" }).checkModelAvailable();
+  });
+
+  test("matches Ollama's implicit :latest tag against a bare model name", async () => {
+    fakeFetch(() =>
+      new Response(JSON.stringify({ data: [{ id: "llama3.2:latest" }] })),
+    );
+    await new OpenAICompatibleClient({ model: "llama3.2" }).checkModelAvailable();
+  });
+
+  test("throws with the available models and a pull hint when the model is missing", async () => {
+    fakeFetch(() =>
+      new Response(JSON.stringify({ data: [{ id: "llama3" }, { id: "deepseek-r1:70b" }] })),
+    );
+    await expect(
+      new OpenAICompatibleClient({ model: "llama3.2" }).checkModelAvailable(),
+    ).rejects.toThrow(/llama3\.2.*not found.*llama3, deepseek-r1:70b.*ollama pull llama3\.2/s);
+  });
+
+  test("stays silent (does not block the run) when /v1/models 404s", async () => {
+    fakeFetch(() => new Response("not found", { status: 404 }));
+    await new OpenAICompatibleClient({ model: "llama3.2" }).checkModelAvailable();
+  });
+
+  test("stays silent when the endpoint is unreachable", async () => {
+    globalThis.fetch = (async () => {
+      throw new Error("connect ECONNREFUSED");
+    }) as unknown as typeof fetch;
+    await new OpenAICompatibleClient({ model: "llama3.2" }).checkModelAvailable();
+  });
+});

@@ -119,10 +119,14 @@ export async function run(opts: RunOptions): Promise<RunSummary> {
   if (!driver) {
     if (driverName === "explorer") {
       const llmLogPath = join(opts.out, "llm.jsonl");
-      const llmClient: LLMClient =
-        opts.llmProvider === "openai-compatible"
-          ? new OpenAICompatibleClient({ model: opts.llmModel })
-          : new AnthropicClient({ model: opts.llmModel });
+      let llmClient: LLMClient;
+      if (opts.llmProvider === "openai-compatible") {
+        const client = new OpenAICompatibleClient({ model: opts.llmModel });
+        await client.checkModelAvailable(); // fail fast, before the browser ever launches
+        llmClient = client;
+      } else {
+        llmClient = new AnthropicClient({ model: opts.llmModel });
+      }
       const explorer = explorerDriver(llmClient, opts.seed, (decision) => {
         const now = Date.now();
         const videoTMs = videoStartedAt === undefined ? null : now - videoStartedAt;

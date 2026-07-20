@@ -117,6 +117,41 @@ export class OpenAICompatibleClient implements LLMClient {
     this.name = `openai-compatible:${this.model}`;
   }
 
+  /**
+   * Best-effort preflight: GET /v1/models (standard OpenAI surface — Ollama,
+   * vLLM, and hosted gateways all expose it) and confirm this client's model
+   * is present. Throws with a copy-pasteable fix instead of letting a
+   * missing model surface as an opaque completion error after the browser
+   * is already up. If the endpoint is unreachable or doesn't exist, this is
+   * NOT proof the model is missing — stays silent and lets the first real
+   * `complete()` call fail (or succeed) on its own.
+   */
+  async checkModelAvailable(): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/models`, {
+        headers: this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {},
+      });
+    } catch {
+      return;
+    }
+    if (!res.ok) return;
+    const json = (await res.json().catch(() => null)) as { data?: Array<{ id: string }> } | null;
+    const ids = json?.data?.map((m) => m.id) ?? [];
+    if (ids.length === 0) return;
+    // Ollama tags default to ":latest"; match the bare name too so
+    // "llama3.2" finds "llama3.2:latest".
+    const bare = this.model.split(":")[0];
+    const found = ids.some((id) => id === this.model || id.split(":")[0] === bare);
+    if (!found) {
+      throw new Error(
+        `${this.name}: model "${this.model}" not found at ${this.baseUrl}. ` +
+          `Available: ${ids.join(", ")}. ` +
+          `If this is Ollama, pull it first: ollama pull ${this.model}`,
+      );
+    }
+  }
+
   async complete(req: CompletionRequest): Promise<CompletionResult> {
     const body: Record<string, unknown> = {
       model: this.model,
