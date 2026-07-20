@@ -26,7 +26,7 @@ import { mulberry32 } from "./prng.ts";
 import { step, type GameSession } from "./executor.ts";
 import { OracleEngine, type OracleFire } from "./oracles.ts";
 import { explorerDriver, type ExplorerStats } from "./explorer.ts";
-import { AnthropicClient } from "./llm.ts";
+import { AnthropicClient, OpenAICompatibleClient, type LLMClient } from "./llm.ts";
 import { TraceWriter, cutTrace, writeTraceFile, type TraceHeader, type TraceLine } from "./trace.ts";
 
 export interface RunOptions {
@@ -41,6 +41,10 @@ export interface RunOptions {
   headed?: boolean;
   driver?: Driver;
   driverName?: string;
+  /** Explorer only: which LLMClient to build. Default "anthropic". */
+  llmProvider?: "anthropic" | "openai-compatible";
+  /** Explorer only: overrides PTC_MODEL for this run. */
+  llmModel?: string;
   /** Disable video recording (rebaseline wants a lean, fast run). */
   video?: boolean;
 }
@@ -115,7 +119,11 @@ export async function run(opts: RunOptions): Promise<RunSummary> {
   if (!driver) {
     if (driverName === "explorer") {
       const llmLogPath = join(opts.out, "llm.jsonl");
-      const explorer = explorerDriver(new AnthropicClient(), opts.seed, (decision) => {
+      const llmClient: LLMClient =
+        opts.llmProvider === "openai-compatible"
+          ? new OpenAICompatibleClient({ model: opts.llmModel })
+          : new AnthropicClient({ model: opts.llmModel });
+      const explorer = explorerDriver(llmClient, opts.seed, (decision) => {
         const now = Date.now();
         const videoTMs = videoStartedAt === undefined ? null : now - videoStartedAt;
         const videoTs =

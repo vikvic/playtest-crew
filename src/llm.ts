@@ -1,13 +1,17 @@
 /**
- * Provider-agnostic LLMClient seam (CLAUDE.md mandate). v0 ships the
- * Anthropic implementation only; OpenAI-compatible and Gemini impls are
- * post-v0 (TODOS.md #1) — copy this shape.
+ * Provider-agnostic LLMClient seam (CLAUDE.md mandate). Anthropic and
+ * OpenAI-compatible (vLLM, Ollama, any /v1/chat/completions gateway) ship
+ * here; Gemini is still post-v0 (TODOS.md #1) — copy either shape.
  *
  * The seam is deliberately tiny: one completion call with a stable system
  * prompt, a per-turn user prompt, and an optional JSON schema the response
  * must conform to. Providers that support constrained decoding enforce the
- * schema server-side (Anthropic: structured outputs); others would prompt
- * for it and validate client-side.
+ * schema server-side (Anthropic: structured outputs; Ollama/vLLM:
+ * `response_format: json_schema`); others would prompt for it and validate
+ * client-side (the explorer driver already falls back to a seeded random
+ * pick on an unparseable or out-of-enum response, so a provider with no
+ * schema support at all still degrades safely, just with a higher fallback
+ * rate visible in the run summary).
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -85,5 +89,89 @@ export class AnthropicClient implements LLMClient {
         cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
       },
     };
+  }
+}
+
+export const DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "http://localhost:11434/v1";
+export const DEFAULT_OPENAI_COMPATIBLE_MODEL = "llama3.2";
+
+/**
+ * Talks to any server implementing the OpenAI /v1/chat/completions shape —
+ * this is how local models plug in (Ollama, vLLM) as well as hosted
+ * OpenAI-compatible gateways. No SDK dependency: the wire format is stable
+ * and small enough that `fetch` is simpler than adding one.
+ */
+export class OpenAICompatibleClient implements LLMClient {
+  readonly name: string;
+  private readonly baseUrl: string;
+  private readonly apiKey?: string;
+  private readonly model: string;
+
+  constructor(opts: { model?: string; baseUrl?: string; apiKey?: string } = {}) {
+    this.model = opts.model ?? process.env.PTC_MODEL ?? DEFAULT_OPENAI_COMPATIBLE_MODEL;
+    this.baseUrl = (opts.baseUrl ?? process.env.PTC_BASE_URL ?? DEFAULT_OPENAI_COMPATIBLE_BASE_URL).replace(
+      /\/+$/,
+      "",
+    );
+    this.apiKey = opts.apiKey ?? process.env.PTC_API_KEY;
+    this.name = `openai-compatible:${this.model}`;
+  }
+
+  async complete(req: CompletionRequest): Promise<CompletionResult> {
+    const body: Record<string, unknown> = {
+      model: this.model,
+      messages: [
+        { role: "system", content: req.system },
+        { role: "user", content: req.user },
+      ],
+      max_tokens: req.maxTokens ?? 300,
+      ...(req.schema
+        ? {
+            response_format: {
+              type: "json_schema",
+              json_schema: { name: "action", strict: true, schema: req.schema },
+            },
+          }
+        : {}),
+    };
+
+    let lastError: unknown;
+    // Same retry contract as the Anthropic client: exhausted retries
+    // propagate, and the runner reports harness-error, not a game bug.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          throw new Error(`${this.name}: HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}`);
+        }
+        const json = (await res.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+          usage?: { prompt_tokens?: number; completion_tokens?: number };
+        };
+        const text = json.choices?.[0]?.message?.content ?? "";
+        if (text === "") throw new Error(`${this.name}: empty completion`);
+        return {
+          text,
+          usage: json.usage
+            ? {
+                inputTokens: json.usage.prompt_tokens ?? 0,
+                outputTokens: json.usage.completion_tokens ?? 0,
+                cacheReadInputTokens: 0,
+              }
+            : undefined,
+        };
+      } catch (e) {
+        lastError = e;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 }

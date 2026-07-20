@@ -48,8 +48,13 @@ function usage(): never {
 Commands:
   playtest run    --game 2048 [--driver random|explorer] [--out runs/<ts>] [--seed 42]
                   [--max-actions N] [--screenshot-every N] [--gap 120] [--headed]
-                  (budget defaults come from specs/<game>.yaml; explorer needs
-                   ANTHROPIC_API_KEY, model via PTC_MODEL, default claude-opus-4-8)
+                  [--llm-provider anthropic|openai-compatible] [--llm-model NAME]
+                  (budget defaults come from specs/<game>.yaml; explorer:
+                   anthropic needs ANTHROPIC_API_KEY (model default claude-opus-4-8);
+                   openai-compatible talks to PTC_BASE_URL (default a local Ollama
+                   at http://localhost:11434/v1, model default llama3.2) — no
+                   API key needed for a local server. --llm-model overrides
+                   PTC_MODEL for this run either way.)
   playtest verify --run <run-dir> | --finding <bundle-dir> [--times 3]
                   (replay each candidate's cut trace; finding = same oracle
                    refires within ±3 actions on EVERY replay, else flake)
@@ -92,6 +97,8 @@ if (command === "run") {
       "screenshot-every": { type: "string" },
       gap: { type: "string", default: String(DEFAULT_ACTION_GAP_MS) },
       driver: { type: "string", default: "random" },
+      "llm-provider": { type: "string", default: "anthropic" },
+      "llm-model": { type: "string" },
       headed: { type: "boolean", default: false },
     },
   });
@@ -99,6 +106,12 @@ if (command === "run") {
   const out = values.out ?? join("runs", stamp);
   if (values.driver !== "random" && values.driver !== "explorer") {
     console.error(`--driver must be "random" or "explorer", got "${values.driver}"`);
+    process.exit(2);
+  }
+  if (values["llm-provider"] !== "anthropic" && values["llm-provider"] !== "openai-compatible") {
+    console.error(
+      `--llm-provider must be "anthropic" or "openai-compatible", got "${values["llm-provider"]}"`,
+    );
     process.exit(2);
   }
   const summary = await run({
@@ -110,6 +123,8 @@ if (command === "run") {
       values["screenshot-every"] === undefined ? undefined : Number(values["screenshot-every"]),
     actionGapMs: Number(values.gap),
     driverName: values.driver,
+    llmProvider: values["llm-provider"] as "anthropic" | "openai-compatible",
+    llmModel: values["llm-model"],
     headed: values.headed,
   });
   console.log(`\nrun ${summary.runId}`);
