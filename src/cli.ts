@@ -43,7 +43,7 @@ import { replay } from "./replayer.ts";
 import { HarnessMismatchError, TraceFormatError } from "./trace.ts";
 
 function usage(): never {
-  console.log(`playtest — replay-first autonomous playtest harness (v0, W3)
+  console.log(`playtest — replay-first autonomous playtest harness (v0, W4)
 
 Commands:
   playtest run    --game 2048 [--driver random|explorer] [--out runs/<ts>] [--seed 42]
@@ -59,9 +59,11 @@ Commands:
                   (replay each candidate's cut trace; finding = same oracle
                    refires within ±3 actions on EVERY replay, else flake)
   playtest hunt   --game 2048 --seeds 1-20 [--driver random|explorer]
+                  [--llm-provider anthropic|openai-compatible] [--llm-model NAME]
                   [--max-actions N] [--out runs/hunt-<ts>] [--times 3]
                   (unattended sweep: run every seed, verify every candidate,
-                   write report.md + report.json)
+                   write report.md + report.json; --llm-provider/--llm-model
+                   apply to every seed in the sweep)
   playtest replay --trace <path> [--times 1] [--headed]
   playtest rebaseline --game 2048 [--seed 42] [--max-actions 60]
                   (re-records baselines/<game>/trace.jsonl against the current
@@ -175,6 +177,8 @@ if (command === "run") {
       game: { type: "string", default: "2048" },
       seeds: { type: "string" },
       driver: { type: "string", default: "random" },
+      "llm-provider": { type: "string", default: "anthropic" },
+      "llm-model": { type: "string" },
       "max-actions": { type: "string" },
       out: { type: "string" },
       times: { type: "string", default: "3" },
@@ -185,6 +189,12 @@ if (command === "run") {
     console.error(`--driver must be "random" or "explorer", got "${values.driver}"`);
     process.exit(2);
   }
+  if (values["llm-provider"] !== "anthropic" && values["llm-provider"] !== "openai-compatible") {
+    console.error(
+      `--llm-provider must be "anthropic" or "openai-compatible", got "${values["llm-provider"]}"`,
+    );
+    process.exit(2);
+  }
   const { hunt, parseSeeds } = await import("./hunt.ts");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const report = await hunt({
@@ -192,6 +202,8 @@ if (command === "run") {
     seeds: parseSeeds(values.seeds),
     out: values.out ?? join("runs", `hunt-${stamp}`),
     driverName: values.driver,
+    llmProvider: values["llm-provider"] as "anthropic" | "openai-compatible",
+    llmModel: values["llm-model"],
     maxActions: values["max-actions"] === undefined ? undefined : Number(values["max-actions"]),
     times: Number(values.times),
   });

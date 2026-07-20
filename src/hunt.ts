@@ -22,6 +22,10 @@ export interface HuntOptions {
   out: string;
   driverName?: string;
   maxActions?: number;
+  /** Explorer only: which LLMClient to build. Default "anthropic". */
+  llmProvider?: "anthropic" | "openai-compatible";
+  /** Explorer only: overrides PTC_MODEL for every seed in the sweep. */
+  llmModel?: string;
   /** Replays per candidate (default 3, the finding bar). */
   times?: number;
 }
@@ -170,6 +174,8 @@ export async function hunt(opts: HuntOptions): Promise<HuntReport> {
       screenshotEvery: 0,
       actionGapMs: 0,
       driverName,
+      llmProvider: opts.llmProvider,
+      llmModel: opts.llmModel,
       video: false,
     });
     report.totalActions += summary.actions;
