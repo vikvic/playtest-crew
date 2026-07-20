@@ -259,6 +259,8 @@ bun src/cli.ts hunt --game 2048 --seeds 1-50
 
 Each seed gets a lean run (no video, no screenshots, `--gap 0`), every candidate is auto-verified 3×, and the hunt ends with `report.md` / `report.json`: verified findings (each with its replay command), flakes, unverified-over-budget candidates, and a per-seed run table. A clean hunt reports "0 verified findings" plainly — that number over N seeds × M actions is itself the deliverable.
 
+`hunt --driver explorer` takes the same `--llm-provider`/`--llm-model` flags as `run` and applies them across every seed in the sweep — e.g. `hunt --seeds 1-50 --driver explorer --llm-provider openai-compatible --llm-model qwen2.5:7b-instruct` runs an unattended, zero-API-cost bug hunt against a local model.
+
 For speed, `--gap 0 --screenshot-every 0` removes all artificial delay; for a turn-based game like 2048 the cost per action is then just harness overhead (~10–30ms), so a 200-action run takes a few seconds. Caveat: that removes *pacing*, it doesn't accelerate the game's clock — a real-time game still runs at wall-clock speed. True acceleration (faking `performance.now()` / `requestAnimationFrame`) is the W3 virtual-time spike; it's a spike because virtual time can itself break replay fidelity.
 
 ## Porting to another game
