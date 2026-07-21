@@ -12,6 +12,10 @@ const hooksRegistry: Record<string, GameHooks> = {
   // Zero bespoke TypeScript — proves the sdk.ts adoption path (see
   // sdk/ptc-sdk.js, specs/dice-demo.yaml, games/dice-demo/index.html).
   "dice-demo": sdkGameHooks({ name: "dice-demo", dir: join(GAMES_ROOT, "dice-demo") }),
+  // Real third-party game (github.com/davidjbrossard/minesweeper),
+  // integrated the way an outside developer following sdk/README.md
+  // would — see specs/minesweeper.yaml for what that took.
+  "minesweeper": sdkGameHooks({ name: "minesweeper", dir: join(GAMES_ROOT, "minesweeper") }),
 };
 
 /**

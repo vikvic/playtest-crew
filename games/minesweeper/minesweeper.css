@@ -1,0 +1,64 @@
+table{
+    padding: 5px;
+    margin: 5px;
+    font-family:Arial, Helvetica, sans-serif;
+    font-weight: bolder;
+}
+td{
+    background-color: rgb(186, 190, 183);
+    padding: 30px;
+}
+td.bomb{
+    background-color: red;
+    animation: shake 1s;
+    background: url('https://media.giphy.com/media/ckCL6oQfuLUuVbB2OH/giphy.gif');
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+td.suspectedBomb{
+    background-color: rgb(161, 233, 151);
+    background: url('https://media.giphy.com/media/Scjoq4LDEfCQLmxpDQ/giphy.gif');
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+td.zero{
+    background-color: rgb(255,250,250);
+}
+td.b1{
+    background-color: rgb(250,230,230);            
+}
+td.b2{
+    background-color: rgb(250,210,210);            
+}
+td.b3{
+    background-color: rgb(250,190,190);            
+}
+td.b4{
+    background-color: rgb(250,180,180);            
+}
+td.b5{
+    background-color: rgb(250,160,160);            
+}
+td.b6{
+    background-color: rgb(250,140,140);            
+}
+td.b7{
+    background-color: rgb(250,100,100);            
+}
+td.b8{
+    background-color: rgb(250,40,40);            
+}
+
+@keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }

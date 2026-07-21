@@ -1,0 +1,113 @@
+# Game spec for games/minesweeper — a real, unmodified third-party game
+# (github.com/davidjbrossard/minesweeper, Apache-2.0), integrated via the
+# SDK model (sdk/README.md) as an outside developer would: only the two
+# documented code changes were made (SDK script tag in minesweeper.html,
+# one PTC.exposeState() call at the end of js/minesweeper.js). No RNG
+# call site was touched.
+
+game: "minesweeper"
+entry: minesweeper.html
+# Tall enough that all 25 grid cells (default onload: generateGame(5,5,5))
+# fall within the viewport -- the executor dispatches clicks at absolute
+# page coordinates with no auto-scroll, so an off-screen cell is simply
+# unclickable.
+viewport: { w: 480, h: 560 }
+
+seed_strategy: global-random-patch
+state_source: adapter
+adapter_version: minesweeper@1
+
+state_notes: >
+  { map: string[5][5] (map[col][row] -- column-major, matches the DOM id
+  scheme "colrow"), a cell is 'B' (bomb, unrevealed), 'REVEALED' (a
+  flood-filled zero-cell), or a number 0-8 (revealed safe cell's
+  neighbor-bomb count); bombsLeft: number (flag counter -- can go
+  negative, see known-issues below); revealed: number (count of revealed
+  SAFE cells, max 20 on a 5x5/5-bomb board) }.
+  KNOWN ISSUE (upstream, not introduced by this integration): clicking a
+  bomb cell adds a CSS class but does not change map/bombsLeft/revealed
+  at all -- the exposed state has no "you lost" signal, only a DOM-visual
+  one the harness cannot see.
+
+# Real-alphabet limitation: this integration only covers LEFT-click reveal
+# actions. The game's flag/unflag mechanic is bound to oncontextmenu
+# (right-click), and src/trace.ts's pointer Action type only supports
+# "click" | "move" -- there is no right-click action today. The flag
+# mechanic (and a real bug in it: unflagging never increments bombsLeft
+# back) is consequently untestable by the harness as it stands.
+actions:
+  - click: { x: 54, y: 173 }
+    description: Reveal cell (col 0, row 0)
+  - click: { x: 125, y: 173 }
+    description: Reveal cell (col 1, row 0)
+  - click: { x: 196, y: 173 }
+    description: Reveal cell (col 2, row 0)
+  - click: { x: 267, y: 173 }
+    description: Reveal cell (col 3, row 0)
+  - click: { x: 338, y: 173 }
+    description: Reveal cell (col 4, row 0)
+  - click: { x: 54, y: 253 }
+    description: Reveal cell (col 0, row 1)
+  - click: { x: 125, y: 253 }
+    description: Reveal cell (col 1, row 1)
+  - click: { x: 196, y: 253 }
+    description: Reveal cell (col 2, row 1)
+  - click: { x: 267, y: 253 }
+    description: Reveal cell (col 3, row 1)
+  - click: { x: 338, y: 253 }
+    description: Reveal cell (col 4, row 1)
+  - click: { x: 54, y: 333 }
+    description: Reveal cell (col 0, row 2)
+  - click: { x: 125, y: 333 }
+    description: Reveal cell (col 1, row 2)
+  - click: { x: 196, y: 333 }
+    description: Reveal cell (col 2, row 2)
+  - click: { x: 267, y: 333 }
+    description: Reveal cell (col 3, row 2)
+  - click: { x: 338, y: 333 }
+    description: Reveal cell (col 4, row 2)
+  - click: { x: 54, y: 413 }
+    description: Reveal cell (col 0, row 3)
+  - click: { x: 125, y: 413 }
+    description: Reveal cell (col 1, row 3)
+  - click: { x: 196, y: 413 }
+    description: Reveal cell (col 2, row 3)
+  - click: { x: 267, y: 413 }
+    description: Reveal cell (col 3, row 3)
+  - click: { x: 338, y: 413 }
+    description: Reveal cell (col 4, row 3)
+  - click: { x: 54, y: 493 }
+    description: Reveal cell (col 0, row 4)
+  - click: { x: 125, y: 493 }
+    description: Reveal cell (col 1, row 4)
+  - click: { x: 196, y: 493 }
+    description: Reveal cell (col 2, row 4)
+  - click: { x: 267, y: 493 }
+    description: Reveal cell (col 3, row 4)
+  - click: { x: 338, y: 493 }
+    description: Reveal cell (col 4, row 4)
+
+budgets:
+  max_actions: 100
+  screenshot_every: 0
+  max_verifications: 5
+
+oracles:
+  console_errors: true
+  hang:
+    unchanged_actions: 5
+  invariants:
+    # placeBombs() runs once at game start and is never mutated afterward
+    # by reveal() -- the bomb count in `map` should never drift.
+    - name: bomb-count-conserved
+      expr: state.map.flat().filter(c => c === "B").length === 5
+    - name: revealed-in-bounds
+      expr: state.revealed >= 0 && state.revealed <= 20
+
+# Our own correct win definition (all 20 safe cells revealed) -- NOT the
+# game's own internal check, which compares against the full 25-cell grid
+# and can never actually fire (see state_notes). Hitting a bomb is not
+# terminal by this definition, since the exposed state can't see it --
+# expect the hang oracle to legitimately fire in that case.
+terminal_states:
+  - state.revealed === 20
