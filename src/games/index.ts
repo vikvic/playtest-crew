@@ -16,6 +16,13 @@ const hooksRegistry: Record<string, GameHooks> = {
   // integrated the way an outside developer following sdk/README.md
   // would — see specs/minesweeper.yaml for what that took.
   "minesweeper": sdkGameHooks({ name: "minesweeper", dir: join(GAMES_ROOT, "minesweeper") }),
+  // A bigger, actively-used real game (github.com/muan/emoji-minesweeper,
+  // 905 stars, live at muan.co/emoji-minesweeper) — see
+  // specs/emoji-minesweeper.yaml for what integrating it took.
+  "emoji-minesweeper": sdkGameHooks({
+    name: "emoji-minesweeper",
+    dir: join(GAMES_ROOT, "emoji-minesweeper"),
+  }),
 };
 
 /**

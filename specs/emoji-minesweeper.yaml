@@ -1,0 +1,282 @@
+# Game spec for games/emoji-minesweeper — a real, actively-used third-party
+# game (github.com/muan/emoji-minesweeper, MIT, 905 stars, live at
+# muan.co/emoji-minesweeper), integrated via the SDK model exactly as an
+# outside developer would: only two additions to the vendored source (the
+# SDK script tag in index.html, one PTC.exposeState() call at the end of
+# game.js). No RNG call site touched.
+#
+# Bigger and more real than games/minesweeper on purpose: a 10x10/100-cell
+# default board (vs. 25 cells), per-cell state living as DOM element
+# properties rather than a central array, a first-click-is-always-safe
+# mechanic that silently reshuffles the whole board if your first click
+# would have hit a bomb, a bundled analytics script, and a service worker
+# registration — all real complexity this project's own code never had to
+# deal with.
+
+game: "emoji-minesweeper"
+entry: index.html
+viewport: { w: 500, h: 700 }
+
+seed_strategy: global-random-patch
+state_source: adapter
+adapter_version: emoji-minesweeper@1
+
+state_notes: >
+  { cells: Array<{isMasked, isBomb, isFlagged, mineCount}> (one entry per
+  .cell DOM element, in row-major DOM order -- NOT a 2D array, this game
+  keeps state as custom properties on individual DOM elements rather than
+  a central grid), result: "won" | "lost" | null, moves: number,
+  cols/rows/bombs: number (board dimensions).
+  DELIBERATE DESIGN CHOICE, not a bug: isBomb/mineCount are exposed for
+  EVERY cell, including still-masked ones -- this is the true internal
+  state used for hashing/replay/oracle verification, not the
+  player-visible view (a real player never sees an unrevealed cell's
+  contents). The explorer therefore plays with full ground-truth vision,
+  which is fine for oracle-driven bug hunting (more thorough exploration)
+  but means llm.jsonl reasoning should not be read as "how a human would
+  reason blind." A fairness-preserving variant would null out isBomb/
+  mineCount for masked cells; not done here so the invariants below can
+  check bomb-count conservation directly against every cell regardless of
+  reveal state.
+  KNOWN QUIRK (upstream, not introduced by this integration): the FIRST
+  reveal click is always guaranteed safe -- if it would have hit a bomb,
+  the game silently regenerates an entirely new board (consuming more of
+  the seeded Math.random stream) and re-clicks the same screen position.
+  Still fully deterministic under a fixed seed, just non-obvious from the
+  action alone.
+  EXPECTED NOISE, not a game bug: the vendored page unconditionally tries
+  to register a service worker at a hardcoded absolute path
+  (/emoji-minesweeper/sw.js) and load Google Analytics from an external
+  CDN. Neither exists relative to the harness's local server / a
+  network-restricted run, so a console-error candidate mentioning either
+  is expected noise, not a finding -- the verify pipeline is exactly what
+  should demote it (nondeterministic depending on network reachability,
+  unrelated to any click sequence).
+
+# Only LEFT-click reveal actions -- same limitation as games/minesweeper:
+# flag/unflag is bound to oncontextmenu (right-click), which
+# src/trace.ts's pointer Action type doesn't support.
+actions:
+  - click: { x: 138, y: 118 }
+    description: Reveal cell (col 0, row 0)
+  - click: { x: 163, y: 118 }
+    description: Reveal cell (col 1, row 0)
+  - click: { x: 188, y: 118 }
+    description: Reveal cell (col 2, row 0)
+  - click: { x: 213, y: 118 }
+    description: Reveal cell (col 3, row 0)
+  - click: { x: 238, y: 118 }
+    description: Reveal cell (col 4, row 0)
+  - click: { x: 263, y: 118 }
+    description: Reveal cell (col 5, row 0)
+  - click: { x: 288, y: 118 }
+    description: Reveal cell (col 6, row 0)
+  - click: { x: 313, y: 118 }
+    description: Reveal cell (col 7, row 0)
+  - click: { x: 338, y: 118 }
+    description: Reveal cell (col 8, row 0)
+  - click: { x: 363, y: 118 }
+    description: Reveal cell (col 9, row 0)
+  - click: { x: 138, y: 143 }
+    description: Reveal cell (col 0, row 1)
+  - click: { x: 163, y: 143 }
+    description: Reveal cell (col 1, row 1)
+  - click: { x: 188, y: 143 }
+    description: Reveal cell (col 2, row 1)
+  - click: { x: 213, y: 143 }
+    description: Reveal cell (col 3, row 1)
+  - click: { x: 238, y: 143 }
+    description: Reveal cell (col 4, row 1)
+  - click: { x: 263, y: 143 }
+    description: Reveal cell (col 5, row 1)
+  - click: { x: 288, y: 143 }
+    description: Reveal cell (col 6, row 1)
+  - click: { x: 313, y: 143 }
+    description: Reveal cell (col 7, row 1)
+  - click: { x: 338, y: 143 }
+    description: Reveal cell (col 8, row 1)
+  - click: { x: 363, y: 143 }
+    description: Reveal cell (col 9, row 1)
+  - click: { x: 138, y: 168 }
+    description: Reveal cell (col 0, row 2)
+  - click: { x: 163, y: 168 }
+    description: Reveal cell (col 1, row 2)
+  - click: { x: 188, y: 168 }
+    description: Reveal cell (col 2, row 2)
+  - click: { x: 213, y: 168 }
+    description: Reveal cell (col 3, row 2)
+  - click: { x: 238, y: 168 }
+    description: Reveal cell (col 4, row 2)
+  - click: { x: 263, y: 168 }
+    description: Reveal cell (col 5, row 2)
+  - click: { x: 288, y: 168 }
+    description: Reveal cell (col 6, row 2)
+  - click: { x: 313, y: 168 }
+    description: Reveal cell (col 7, row 2)
+  - click: { x: 338, y: 168 }
+    description: Reveal cell (col 8, row 2)
+  - click: { x: 363, y: 168 }
+    description: Reveal cell (col 9, row 2)
+  - click: { x: 138, y: 193 }
+    description: Reveal cell (col 0, row 3)
+  - click: { x: 163, y: 193 }
+    description: Reveal cell (col 1, row 3)
+  - click: { x: 188, y: 193 }
+    description: Reveal cell (col 2, row 3)
+  - click: { x: 213, y: 193 }
+    description: Reveal cell (col 3, row 3)
+  - click: { x: 238, y: 193 }
+    description: Reveal cell (col 4, row 3)
+  - click: { x: 263, y: 193 }
+    description: Reveal cell (col 5, row 3)
+  - click: { x: 288, y: 193 }
+    description: Reveal cell (col 6, row 3)
+  - click: { x: 313, y: 193 }
+    description: Reveal cell (col 7, row 3)
+  - click: { x: 338, y: 193 }
+    description: Reveal cell (col 8, row 3)
+  - click: { x: 363, y: 193 }
+    description: Reveal cell (col 9, row 3)
+  - click: { x: 138, y: 218 }
+    description: Reveal cell (col 0, row 4)
+  - click: { x: 163, y: 218 }
+    description: Reveal cell (col 1, row 4)
+  - click: { x: 188, y: 218 }
+    description: Reveal cell (col 2, row 4)
+  - click: { x: 213, y: 218 }
+    description: Reveal cell (col 3, row 4)
+  - click: { x: 238, y: 218 }
+    description: Reveal cell (col 4, row 4)
+  - click: { x: 263, y: 218 }
+    description: Reveal cell (col 5, row 4)
+  - click: { x: 288, y: 218 }
+    description: Reveal cell (col 6, row 4)
+  - click: { x: 313, y: 218 }
+    description: Reveal cell (col 7, row 4)
+  - click: { x: 338, y: 218 }
+    description: Reveal cell (col 8, row 4)
+  - click: { x: 363, y: 218 }
+    description: Reveal cell (col 9, row 4)
+  - click: { x: 138, y: 243 }
+    description: Reveal cell (col 0, row 5)
+  - click: { x: 163, y: 243 }
+    description: Reveal cell (col 1, row 5)
+  - click: { x: 188, y: 243 }
+    description: Reveal cell (col 2, row 5)
+  - click: { x: 213, y: 243 }
+    description: Reveal cell (col 3, row 5)
+  - click: { x: 238, y: 243 }
+    description: Reveal cell (col 4, row 5)
+  - click: { x: 263, y: 243 }
+    description: Reveal cell (col 5, row 5)
+  - click: { x: 288, y: 243 }
+    description: Reveal cell (col 6, row 5)
+  - click: { x: 313, y: 243 }
+    description: Reveal cell (col 7, row 5)
+  - click: { x: 338, y: 243 }
+    description: Reveal cell (col 8, row 5)
+  - click: { x: 363, y: 243 }
+    description: Reveal cell (col 9, row 5)
+  - click: { x: 138, y: 268 }
+    description: Reveal cell (col 0, row 6)
+  - click: { x: 163, y: 268 }
+    description: Reveal cell (col 1, row 6)
+  - click: { x: 188, y: 268 }
+    description: Reveal cell (col 2, row 6)
+  - click: { x: 213, y: 268 }
+    description: Reveal cell (col 3, row 6)
+  - click: { x: 238, y: 268 }
+    description: Reveal cell (col 4, row 6)
+  - click: { x: 263, y: 268 }
+    description: Reveal cell (col 5, row 6)
+  - click: { x: 288, y: 268 }
+    description: Reveal cell (col 6, row 6)
+  - click: { x: 313, y: 268 }
+    description: Reveal cell (col 7, row 6)
+  - click: { x: 338, y: 268 }
+    description: Reveal cell (col 8, row 6)
+  - click: { x: 363, y: 268 }
+    description: Reveal cell (col 9, row 6)
+  - click: { x: 138, y: 293 }
+    description: Reveal cell (col 0, row 7)
+  - click: { x: 163, y: 293 }
+    description: Reveal cell (col 1, row 7)
+  - click: { x: 188, y: 293 }
+    description: Reveal cell (col 2, row 7)
+  - click: { x: 213, y: 293 }
+    description: Reveal cell (col 3, row 7)
+  - click: { x: 238, y: 293 }
+    description: Reveal cell (col 4, row 7)
+  - click: { x: 263, y: 293 }
+    description: Reveal cell (col 5, row 7)
+  - click: { x: 288, y: 293 }
+    description: Reveal cell (col 6, row 7)
+  - click: { x: 313, y: 293 }
+    description: Reveal cell (col 7, row 7)
+  - click: { x: 338, y: 293 }
+    description: Reveal cell (col 8, row 7)
+  - click: { x: 363, y: 293 }
+    description: Reveal cell (col 9, row 7)
+  - click: { x: 138, y: 318 }
+    description: Reveal cell (col 0, row 8)
+  - click: { x: 163, y: 318 }
+    description: Reveal cell (col 1, row 8)
+  - click: { x: 188, y: 318 }
+    description: Reveal cell (col 2, row 8)
+  - click: { x: 213, y: 318 }
+    description: Reveal cell (col 3, row 8)
+  - click: { x: 238, y: 318 }
+    description: Reveal cell (col 4, row 8)
+  - click: { x: 263, y: 318 }
+    description: Reveal cell (col 5, row 8)
+  - click: { x: 288, y: 318 }
+    description: Reveal cell (col 6, row 8)
+  - click: { x: 313, y: 318 }
+    description: Reveal cell (col 7, row 8)
+  - click: { x: 338, y: 318 }
+    description: Reveal cell (col 8, row 8)
+  - click: { x: 363, y: 318 }
+    description: Reveal cell (col 9, row 8)
+  - click: { x: 138, y: 343 }
+    description: Reveal cell (col 0, row 9)
+  - click: { x: 163, y: 343 }
+    description: Reveal cell (col 1, row 9)
+  - click: { x: 188, y: 343 }
+    description: Reveal cell (col 2, row 9)
+  - click: { x: 213, y: 343 }
+    description: Reveal cell (col 3, row 9)
+  - click: { x: 238, y: 343 }
+    description: Reveal cell (col 4, row 9)
+  - click: { x: 263, y: 343 }
+    description: Reveal cell (col 5, row 9)
+  - click: { x: 288, y: 343 }
+    description: Reveal cell (col 6, row 9)
+  - click: { x: 313, y: 343 }
+    description: Reveal cell (col 7, row 9)
+  - click: { x: 338, y: 343 }
+    description: Reveal cell (col 8, row 9)
+  - click: { x: 363, y: 343 }
+    description: Reveal cell (col 9, row 9)
+
+budgets:
+  max_actions: 200
+  screenshot_every: 0
+  max_verifications: 5
+
+oracles:
+  console_errors: true
+  hang:
+    unchanged_actions: 5
+  invariants:
+    - name: bomb-count-conserved
+      expr: state.cells.filter(c => c.isBomb).length === state.bombs
+    - name: unmasked-in-bounds
+      expr: state.cells.filter(c => !c.isMasked).length <= state.cells.length
+    - name: moves-non-negative
+      expr: state.moves >= 0
+
+# Unlike games/minesweeper, this game's own `result` field cleanly captures
+# BOTH win and loss -- no missing-loss-signal gap this time.
+terminal_states:
+  - state.result === "won"
+  - state.result === "lost"
