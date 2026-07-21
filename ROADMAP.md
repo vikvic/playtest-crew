@@ -103,9 +103,20 @@ the CI replay smoke deferred from W2.
   linked from the README.
 - **Repo visibility:** held private for now (explicit call — not yet ready
   to make public).
-- **Deferred, not cancelled:** upstream bug filing on real 2048 — revisit
-  once the local-LLM path makes the harness cheap to hand out for anyone
-  to reproduce a report against.
+- **Upstream bug filing — done, but on a small proof target, not a real
+  one yet.** Deferred from W4 itself in favor of local-LLM support (see
+  above); filed post-v0 instead, once the SDK model made a second game
+  integration cheap. Filed:
+  [davidjbrossard/minesweeper#1](https://github.com/davidjbrossard/minesweeper/issues/1)
+  — a real, 3/3-verified `revealed` counter bug found on the very first
+  extended run against `games/minesweeper` (see the SDK adoption entry
+  below). **Caveat:** the target repo is a small, effectively unused
+  example project (0 stars, not in active use) — it proves the pipeline
+  can find and file a real bug end-to-end, but it is not evidence the
+  harness delivers value against a game anyone actually plays. **Still
+  needed:** run the same hunt against a bigger, actively-maintained or
+  widely-used web game to get a finding that actually demonstrates
+  product value, not just pipeline correctness.
 
 ## Post-v0 (in progress, unblocked after W4's demand checkpoint)
 
@@ -144,11 +155,17 @@ the CI replay smoke deferred from W2.
   - `browser.ts` now serves `sdk/ptc-sdk.js` at a fixed URL
     (`/__ptc_sdk__/ptc-sdk.js`) for every registered game, so nothing needs
     vendoring into the game's own directory.
-  - **Proof:** `games/dice-demo` — a from-scratch turn-based game with no
+  - **Proof, from-scratch:** `games/dice-demo` — a purpose-built toy with no
     playtest-crew-specific code beyond one `exposeState()` call — runs,
     replays 3/3, and hunts cleanly through the unmodified pipeline
     (`run`/`replay`/`verify`/`hunt` all work; only `GameConfig` matters to
     them, not how a game implements it).
+  - **Proof, real third-party code:** `games/minesweeper` (vendored,
+    unmodified apart from the two documented SDK steps) — 3/3 replay,
+    and a real, previously-unknown bug found and 3/3-verified on the
+    first extended run (filed upstream, see below). This is a small,
+    low-stakes repo, so treat it as proof the mechanism works, not proof
+    the harness is valuable against something people actually play.
 
 ## Post-v0
 

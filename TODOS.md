@@ -3,12 +3,25 @@
 Source of truth for context: the design doc at
 `~/.gstack/projects/playtest-crew/vic-master-design-20260706-234327.md`.
 
-## 1. Formalize the precision metric
+## 1. Port and hunt a bigger, actively-used real game
+- **What:** Repeat the `games/minesweeper` SDK integration against a web
+  game with real traffic/stars/active maintenance, and run a proper hunt
+  (many seeds, real budget) against it, not just a quick smoke.
+- **Why:** `davidjbrossard/minesweeper#1` proved the pipeline can find and
+  file a real bug end-to-end, but that repo is small and effectively
+  unused (0 stars) — it's proof of mechanism, not proof of value. A
+  finding on something people actually play is the credible outreach
+  artifact this project still doesn't have.
+- **Depends on:** nothing technical — the SDK model and `hunt` already
+  work; this is a target-selection and time-investment task, not a
+  build task.
+
+## 2. Formalize the precision metric
 - **What:** Track "fraction of verified findings a human agrees are real bugs" as a first-class metric alongside replay survival.
 - **Why:** replay survival measures reproducibility, not truth (outside-voice finding #5); v0 handles this informally via human sanity-check before filing.
 - **Depends on:** enough real findings to measure (post-W3 hunt).
 
-## 2. Scripted action prefix — steer the driver deterministically
+## 3. Scripted action prefix — steer the driver deterministically
 - **What:** Let a run start with a declared, fixed action sequence ("always
   do X first"), then hand control to the driver (random or explorer). Likely
   a `setup_actions` list in the YAML spec, executed through the same
@@ -21,7 +34,7 @@ Source of truth for context: the design doc at
 - **Start:** parse `setup_actions` in `src/spec.ts`, dispatch them before the
   driver loop in `src/runner.ts`.
 
-## 3. Vision-based perception (OpenCV / vision model) for closed games
+## 4. Vision-based perception (OpenCV / vision model) for closed games
 - **What:** A perception layer for games that can't expose
   `window.__ptc_state()` (canvas-only, no source access): screenshot →
   vision model or CV → structured state.
@@ -36,7 +49,7 @@ Source of truth for context: the design doc at
 - **Start:** as a spike on one canvas game, same 30-minute disqualification
   format as the Phaser spikes.
 
-## 4. Real-time games: virtual-time control (pause/step the game loop)
+## 5. Real-time games: virtual-time control (pause/step the game loop)
 - **What:** Harness-controlled game clock — fake `performance.now()` /
   `requestAnimationFrame` / timers via injected shims so real-time games can
   be paused, single-stepped, and replayed deterministically.
@@ -48,7 +61,7 @@ Source of truth for context: the design doc at
 - **Risk:** virtual time can itself break replay fidelity — stays a spike
   until proven.
 
-## 5. UX-issue reporting (subjective findings alongside bugs)
+## 6. UX-issue reporting (subjective findings alongside bugs)
 - **What:** Extend the hunt report beyond oracle-verified bugs to
   LLM-judged user-experience issues (confusing states, unclear feedback,
   dead-feeling interactions), sourced from the explorer's per-step
@@ -59,10 +72,10 @@ Source of truth for context: the design doc at
   judge as a false-positive/trust risk. UX findings can't be
   replay-verified, so they must be reported in a clearly separate,
   lower-trust section — never mixed with verified findings.
-- **Depends on:** TODO 1's precision metric thinking (how to keep trust
+- **Depends on:** TODO 2's precision metric thinking (how to keep trust
   measurable for unverifiable findings).
 
-## 6. Other game platforms (beyond the browser)
+## 7. Other game platforms (beyond the browser)
 - **What:** Unity / native / mobile targets.
 - **Why recorded:** asked for explicitly; nearest in-scope expansion is
   other *browser* engines (Phaser spikes, deferred from W2/W3). Anything
@@ -72,4 +85,4 @@ Source of truth for context: the design doc at
   platform; Phaser spikes first as the cheap expansion.
 
 ## Also recorded in the design doc (not duplicated here)
-- Virtual-time replay spike → Open Question 5 (W3 timeboxed) — now TODO 4.
+- Virtual-time replay spike → Open Question 5 (W3 timeboxed) — now TODO 5.
