@@ -3,18 +3,34 @@
 Source of truth for context: the design doc at
 `~/.gstack/projects/playtest-crew/vic-master-design-20260706-234327.md`.
 
-## 1. Port and hunt a bigger, actively-used real game
-- **What:** Repeat the `games/minesweeper` SDK integration against a web
-  game with real traffic/stars/active maintenance, and run a proper hunt
-  (many seeds, real budget) against it, not just a quick smoke.
-- **Why:** `davidjbrossard/minesweeper#1` proved the pipeline can find and
-  file a real bug end-to-end, but that repo is small and effectively
-  unused (0 stars) — it's proof of mechanism, not proof of value. A
-  finding on something people actually play is the credible outreach
-  artifact this project still doesn't have.
-- **Depends on:** nothing technical — the SDK model and `hunt` already
-  work; this is a target-selection and time-investment task, not a
-  build task.
+## 1. Get a defect-level finding on a bigger, actively-used real game
+- **What:** `games/emoji-minesweeper` (muan/emoji-minesweeper, MIT, 905
+  stars, updated days ago, live at muan.co/emoji-minesweeper) is done —
+  a real, bigger, messier game (100-cell board, per-cell DOM-property
+  state, a board-reshuffling first-click-safety mechanic, analytics +
+  service worker noise) integrated via the SDK model, 3/3 replay
+  verified. **Still open:** a 20-seed hunt against it found 2 verified
+  (3/3) hang candidates, but on inspection neither is a real defect —
+  both are the hang oracle correctly catching a no-op streak after an
+  early flood-fill reveal exposed most of the board in one click. So
+  the bigger-target integration is proven, but the "finding that
+  demonstrates product value to someone other than us" goal from the
+  previous version of this item is still unmet.
+- **Why:** replay survival and hunt correctness are proven twice now
+  (minesweeper, emoji-minesweeper); a *defect* found on something people
+  actually play — not a mechanism proof — is the piece still missing.
+- **Depends on:** either deeper hunting against `emoji-minesweeper`
+  (more seeds, larger budgets, or a real invariant violation rather than
+  a hang) or a third target. Two side-findings from this attempt worth
+  folding into whichever comes next: (a) `exposeState()` here exposes
+  full ground truth (unmasked bomb locations) rather than the
+  player-visible view — a deliberate, documented choice for this game,
+  but worth deciding as a general SDK convention; (b) the local 7B
+  explorer (`qwen2.5:7b-instruct`) repeats action picks over a 100-item
+  action alphabet that it reliably avoids over 2048's 4-item one — a
+  real scaling limit on the explorer's ability to track "which of N
+  things did I just pick" as the action space grows, independent of
+  reasoning quality.
 
 ## 2. Formalize the precision metric
 - **What:** Track "fraction of verified findings a human agrees are real bugs" as a first-class metric alongside replay survival.

@@ -113,10 +113,20 @@ the CI replay smoke deferred from W2.
   below). **Caveat:** the target repo is a small, effectively unused
   example project (0 stars, not in active use) — it proves the pipeline
   can find and file a real bug end-to-end, but it is not evidence the
-  harness delivers value against a game anyone actually plays. **Still
-  needed:** run the same hunt against a bigger, actively-maintained or
-  widely-used web game to get a finding that actually demonstrates
-  product value, not just pipeline correctness.
+  harness delivers value against a game anyone actually plays.
+- **Attempted against a bigger, actively-used target — mechanism
+  reconfirmed, no new defect yet.** `games/emoji-minesweeper` (905
+  stars, updated days ago, live at muan.co/emoji-minesweeper): 3/3
+  replay verified on a materially harder integration (100-cell board,
+  per-cell DOM-property state instead of a central array, a
+  board-reshuffling first-click-safety mechanic, bundled analytics +
+  service worker noise). A 20-seed hunt surfaced 2 verified (3/3) hang
+  candidates, but both turned out to be the hang oracle correctly
+  catching a no-op streak after an early flood-fill reveal exposed most
+  of the board in one click — not product defects, so nothing was filed.
+  **Still needed:** TODOS.md #1 — either hunt this target harder or find
+  a different one to get the actual "this matters to someone else"
+  finding.
 
 ## Post-v0 (in progress, unblocked after W4's demand checkpoint)
 
@@ -166,6 +176,12 @@ the CI replay smoke deferred from W2.
     first extended run (filed upstream, see below). This is a small,
     low-stakes repo, so treat it as proof the mechanism works, not proof
     the harness is valuable against something people actually play.
+  - **Proof, bigger and actively-used:** `games/emoji-minesweeper` (905
+    stars, live at muan.co/emoji-minesweeper) — same 3/3 replay result on
+    a materially harder integration (100-cell board, per-cell
+    DOM-property state, a board-reshuffling mechanic, real network/SW
+    noise); see the upstream-bug entry below for the honest result of
+    hunting it (mechanism reconfirmed, no defect found yet).
 
 ## Post-v0
 
